@@ -1,6 +1,6 @@
 {
   "name": "@epdoc/console-logger",
-  "version": "1.0.0",
+  "version": "0.1.0-beta.1",
   "description": "A simple console logger for Node.js with color support",
   "main": "dist/src/index.js",
   "author": "James Pravetz <jpravetz@gmail.com>",
@@ -12,6 +12,7 @@
     "test": "npm run clear-warning; jest --runInBand",
     "format": "prettier --write 'src/**/*.ts'",
     "launch": "node launchgen.js",
+    "publish": "npm publish --access public",
     "start": "node dist/src/index.js"
   },
   "dependencies": {
