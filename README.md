@@ -1,13 +1,14 @@
 # console-logger
 
-A console logger for TypeScript projects.
+A console logger with color support and method chaining.
 
 ## Features
 
 - Multiple log levels (trace, debug, verbose, info, warn, error)
 - Customizable output formatting, including colors and styles
-- Elapsed time tracking
-- Chainable API for easy use
+- Chainable API - `log.h1('header').info('plain text')`
+- Can include elapsed time in log messages - `log.elapsed().info('Finished')`
+- Mock mode for testing - `log.mock.enable = true; log.info('test');`
 
 ## Installation
 
@@ -18,7 +19,11 @@ npm install @epdoc/console-logger
 ## Usage
 
 ```typescript
-import { log } from '@epdoc/console-logger';
+import { Logger } from '@epdoc/console-logger';
+
+// Declare one global logger instance and import it wherever you need to log
+const log = new Logger();
+log.style.enable(true);
 
 log.info('Hello, world!');
 ```
@@ -35,7 +40,7 @@ log.debug('Now this debug message will be shown');
 ### Chaining Methods
 
 A line of output can be built up using method chaining, and is only output when
-one of the methods `info`, `error`, `trace`, `debug`, `verbose` or `output` are
+one of the methods `trace`, `debug`, `verbose`, `info` or `output` are
 called.
 
 ```typescript
@@ -56,7 +61,12 @@ log.res('Operation completed').elapsed().info();
 ### Using Indentation
 
 ```typescript
-log.indent().info('This is indented');
+log.indent().info('This is indented by the default 2 spaces');
+log.res('This is also indented by 2 spaces').info();
+log.indent('>>').info('This is indented by ">> "');
+log.indent(4).info('This is indented by 4 spaces');
+log.res2('This is also indented by 4 spaces').info();
+log.res2().info('This is also indented by 4 spaces');
 log.info('This is not indented');
 ```
 
@@ -67,37 +77,6 @@ log.h1('Big Header').info('This is a big header');
 log.h2('Smaller Header').info('This is a smaller header');
 ```
 
-### Using Styles
-
-```typescript
-log.style('h1', 'This is a big header').info('This is a big header');
-log.style('h2', 'This is a smaller header').info('This is a smaller header');
-```
-
-### Using Colors
-
-```typescript
-log.color('red', 'This is red text').info('This is red text');
-log.color('green', 'This is green text').info('This is green text');
-log.color('blue', 'This is blue text').info('This is blue text');
-```
-
-### Using Background Colors
-
-```typescript
-log.bgColor('red', 'This is red text').info('This is red text');
-log.bgColor('green', 'This is green text').info('This is green text');
-log.bgColor('blue', 'This is blue text').info('This is blue text');
-```
-
-### Using Colors
-
-```typescript
-log.color('red', 'This is red text').info('This is red text');
-log.color('green', 'This is green text').info('This is green text');
-log.color('blue', 'This is blue text').info('This is blue text');
-```
-
 ### Mock Mode for Testing
 
 ```typescript
@@ -106,7 +85,6 @@ log.info('Test message');
 console.log(log.mock.value); // ['Test message']
 ```
 
-
 ## API Reference
 
 ### Logger Class
@@ -114,30 +92,38 @@ console.log(log.mock.value); // ['Test message']
 - `constructor(level: LogLevel = LogLevel.info)`
 - `setLevel(level: LogLevel | string): this`
 - `getLevel(): LogLevel`
+- `style: Style` (setter and getter)
 - `isEnabledFor(level: LogLevel): boolean`
 - `elapsed(): this`
 - `clear(): this`
+
+#### Methods for Pre-formatted Text
+
 - `text(...args: any[]): this`
 - `data(arg: any): this`
-- `res(...args: any[]): this`
-- `res2(...args: any[]): this`
-- `action(...args: any[]): this`
 - `h1(...args: any[]): this`
 - `h2(...args: any[]): this`
 - `h3(...args: any[]): this`
 - `label(...args: any[]): this`
+- `action(...args: any[]): this`
 - `value(...args: any[]): this`
 - `path(...args: any[]): this`
 - `date(arg: any): this`
 - `alert(arg: any): this`
 - `warn(...args: any[]): this`
 - `error(...args: any[]): this`
+- `stylize(style: StyleName | StyleDef, ...args: any[]): this`
+- `res(...args: any[]): this`
+- `res2(...args: any[]): this`
+- `indent(n: Integer = 2): this`
+
+#### Methods for Output
+
 - `trace(...args: any[]): this`
 - `debug(...args: any[]): this`
 - `verbose(...args: any[]): this`
 - `info(...args: any[]): this`
 - `output(...args: any[]): this`
-- `skip(val: any): boolean`
 
 ### LogLevel Enum
 
@@ -147,10 +133,6 @@ console.log(log.mock.value); // ['Test message']
 - `info = 7`
 - `warn = 8`
 - `error = 9`
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 

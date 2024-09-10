@@ -1,17 +1,31 @@
-import { asInt, Integer, isString } from '@epdoc/typeutil';
-import { elapsedTime, Style } from './style';
+import { asInt, Integer, isInteger, isNonEmptyString, isString } from '@epdoc/typeutil';
+import { Style, StyleDef, StyleName } from './style';
+import { elapsedTime } from './util';
 
 const REG = {
   isDigit: new RegExp(/^\d$/)
 };
 
-export enum LogLevel {
-  trace = 1,
-  debug = 3,
-  verbose = 5,
-  info = 7,
-  warn = 8,
-  error = 9
+export const logLevel = {
+  trace: 1,
+  debug: 3,
+  verbose: 5,
+  info: 7,
+  warn: 8,
+  error: 9
+} as const;
+
+export type LogLevel = keyof typeof logLevel;
+export type LogLevelValue = (typeof logLevel)[LogLevel];
+
+function logLevelToValue(level: LogLevel | LogLevelValue): LogLevelValue {
+  if (isLogLevelValue(level)) {
+    return level;
+  } else if (isString(level) && isLogLevelValue(asInt(level))) {
+    return asInt(level) as LogLevelValue;
+  } else if (level in logLevel) {
+    return logLevel[level];
+  }
 }
 
 /**
@@ -19,7 +33,7 @@ export enum LogLevel {
  * @param {any} val - The value to check.
  * @returns {boolean} True if the value is a valid LogLevel, false otherwise.
  */
-export function isLogLevel(val: any): val is LogLevel {
+export function isLogLevelValue(val: any): val is LogLevelValue {
   return [1, 3, 5, 7, 8, 9].includes(val);
 }
 
@@ -32,7 +46,8 @@ export function isLogLevel(val: any): val is LogLevel {
  * ```
  */
 export class Logger {
-  protected _level: LogLevel = LogLevel.info;
+  protected _style: Style;
+  protected _level: LogLevelValue = logLevel.info;
   protected _elapsed = false;
   protected _pre: string[] = [];
   public mock = {
@@ -41,11 +56,33 @@ export class Logger {
   };
 
   /**
-   * Creates a new Logger instance.
+   * Creates a new Logger instance using the default style.
    * @param {LogLevel} level - The initial log level (default: LogLevel.info).
    */
-  constructor(level: LogLevel = LogLevel.info) {
+  constructor(level: LogLevelValue | LogLevel = logLevel.info) {
     this.setLevel(level);
+    // Set the default style
+    this._style = new Style();
+  }
+
+  /**
+   * Sets an alternate style for the logger.
+   * @param {Style} style - The style to set.
+   * @throws {Error} If the style is not a Style.
+   */
+  set style(style: Style) {
+    if (!(style instanceof Style)) {
+      throw new Error('style must be a Style');
+    }
+    this._style = style;
+  }
+
+  /**
+   * Gets the current style.
+   * @returns {Style} The current style.
+   */
+  get style(): Style {
+    return this._style;
   }
 
   /**
@@ -53,22 +90,8 @@ export class Logger {
    * @param {LogLevel | 'trace' | 'debug' | 'verbose' | 'info' | 'error'} level - The log level to set.
    * @returns {this} The Logger instance.
    */
-  setLevel(level: LogLevel | 'trace' | 'debug' | 'verbose' | 'info' | 'error'): this {
-    if (isLogLevel(level)) {
-      this._level = level;
-    } else if (isString(level) && REG.isDigit.test(level)) {
-      this._level = asInt(level);
-    } else if (level === 'trace') {
-      this._level = LogLevel.trace;
-    } else if (level === 'debug') {
-      this._level = LogLevel.debug;
-    } else if (level === 'verbose') {
-      this._level = LogLevel.verbose;
-    } else if (level === 'info') {
-      this._level = LogLevel.info;
-    } else if (level === 'error') {
-      this._level = LogLevel.error;
-    }
+  setLevel(level: LogLevel | LogLevelValue): this {
+    this._level = logLevelToValue(level);
     return this;
   }
 
@@ -76,7 +99,7 @@ export class Logger {
    * Gets the current log level.
    * @returns {LogLevel} The current log level.
    */
-  getLevel(): LogLevel {
+  getLevel(): LogLevelValue {
     return this._level;
   }
 
@@ -88,8 +111,8 @@ export class Logger {
    * @returns {boolean} True if the logger is enabled for the given level, false
    * otherwise.
    */
-  isEnabledFor(val: LogLevel): boolean {
-    return this._level <= val;
+  isEnabledFor(val: LogLevel | LogLevelValue): boolean {
+    return this._level <= logLevelToValue(val);
   }
 
   /**
@@ -116,7 +139,7 @@ export class Logger {
   }
 
   /**
-   * Adds unformattedtext to the log message.
+   * Adds unformatted text to the log message.
    * @param {...any[]} args - The text arguments to add.
    * @returns {this} The Logger instance.
    */
@@ -136,12 +159,16 @@ export class Logger {
   }
 
   /**
-   * Adds indentation to the log message.
-   * @param {number} n - The number of spaces to indent. The minimum indent is 2.
+   * Indents the log message.
+   * @param {Integer | string} n - The number of spaces to indent or the string to indent with.
    * @returns {this} The Logger instance.
    */
-  indent(n: Integer = 2): this {
-    this._pre.push(' '.repeat(n - 1));
+  indent(n: Integer | string = 2): this {
+    if (isInteger(n)) {
+      this._pre.push(' '.repeat(n - 1));
+    } else if (isNonEmptyString(n)) {
+      this._pre.push(n);
+    }
     return this;
   }
 
@@ -169,12 +196,24 @@ export class Logger {
   }
 
   /**
+   * Adds styled text to the log message.
+   * @param {any} val - The value to style.
+   * @param {StyleName | StyleDef} style - The style to use.
+   * @returns {this} The Logger instance.
+   */
+  stylize(style: StyleName | StyleDef, ...args): this {
+    const styleDef: StyleDef = isNonEmptyString(style) ? this._style.styles[style] : style;
+    this._pre.push(this._style.format(args.join(' '), styleDef));
+    return this;
+  }
+
+  /**
    * Adds styled action text to the log message.
    * @param {...any[]} args - The text arguments to add.
    * @returns {this} The Logger instance.
    */
   action(...args): this {
-    this._pre.push(Style.action(args.join(' ')));
+    this._pre.push(this.style.format(args.join(' '), this.style.styles.action));
     return this;
   }
 
@@ -184,7 +223,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   h1(...args): this {
-    this._pre.push(Style.h1(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'h1'));
     return this;
   }
 
@@ -194,7 +233,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   h2(...args): this {
-    this._pre.push(Style.h2(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'h2'));
     return this;
   }
 
@@ -204,7 +243,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   h3(...args): this {
-    this._pre.push(Style.h3(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'h3'));
     return this;
   }
 
@@ -214,7 +253,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   label(...args): this {
-    this._pre.push(Style.label(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'label'));
     return this;
   }
 
@@ -224,7 +263,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   value(...args): this {
-    this._pre.push(Style.value(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'value'));
     return this;
   }
 
@@ -234,7 +273,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   path(...args): this {
-    this._pre.push(Style.path(args.join(' ')));
+    this._pre.push(this.format(args.join(' '), 'path'));
     return this;
   }
 
@@ -244,7 +283,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   date(arg): this {
-    this._pre.push(Style.date(arg));
+    this._pre.push(this.format(arg, 'date'));
     return this;
   }
 
@@ -254,7 +293,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   alert(arg): this {
-    this._pre.push(Style.warn(arg));
+    this._pre.push(this.format(arg, 'warn'));
     return this;
   }
 
@@ -264,8 +303,8 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   warn(...args): this {
-    this._pre.push(Style.warn('WARNING:'));
-    this._pre.push(Style.warn(args.join(' ')));
+    this._pre.push(this.format('WARNING:', 'warn'));
+    this._pre.push(this.format(args.join(' '), 'warn'));
     return this;
   }
 
@@ -275,8 +314,8 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   error(...args): this {
-    this._pre.push(Style.error('ERROR:'));
-    this._pre.push(Style.error(args.join(' ')));
+    this._pre.push(this.format('ERROR:', 'error'));
+    this._pre.push(this.format(args.join(' '), 'error'));
     return this;
   }
 
@@ -286,7 +325,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   trace(...args): this {
-    if (this._level <= LogLevel.trace) {
+    if (this._level <= logLevel.trace) {
       return this.output(...args);
     }
     return this.clear();
@@ -298,7 +337,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   debug(...args): this {
-    if (this._level <= LogLevel.debug) {
+    if (this._level <= logLevel.debug) {
       return this.output(...args);
     }
     return this.clear();
@@ -310,7 +349,7 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   verbose(...args): this {
-    if (this._level <= LogLevel.verbose) {
+    if (this._level <= logLevel.verbose) {
       return this.output(...args);
     }
     return this.clear();
@@ -322,10 +361,14 @@ export class Logger {
    * @returns {this} The Logger instance.
    */
   info(...args): this {
-    if (this._level <= LogLevel.info) {
+    if (this._level <= logLevel.info) {
       return this.output(...args);
     }
     return this.clear();
+  }
+
+  protected format(val: any, styleName: StyleName): string {
+    return this._style.format(val, this._style.styles[styleName]);
   }
 
   /**
@@ -359,8 +402,3 @@ export class Logger {
     return false;
   }
 }
-
-/**
- * Default logger instance.
- */
-export const log = new Logger();

@@ -1,28 +1,28 @@
-import { Logger, LogLevel } from '../src';
+import { Logger, logLevel } from '../src';
 
 describe('log', () => {
   describe('constructor', () => {
     it('getLevel default', () => {
       const log1 = new Logger();
       expect(log1.getLevel()).toBe(7);
-      expect(log1.isEnabledFor(LogLevel.trace)).toBe(false);
-      expect(log1.isEnabledFor(LogLevel.debug)).toBe(false);
-      expect(log1.isEnabledFor(LogLevel.verbose)).toBe(false);
-      expect(log1.isEnabledFor(LogLevel.info)).toBe(true);
-      expect(log1.isEnabledFor(LogLevel.warn)).toBe(true);
-      expect(log1.isEnabledFor(LogLevel.error)).toBe(true);
+      expect(log1.isEnabledFor(logLevel.trace)).toBe(false);
+      expect(log1.isEnabledFor(logLevel.debug)).toBe(false);
+      expect(log1.isEnabledFor(logLevel.verbose)).toBe(false);
+      expect(log1.isEnabledFor(logLevel.info)).toBe(true);
+      expect(log1.isEnabledFor(logLevel.warn)).toBe(true);
+      expect(log1.isEnabledFor(logLevel.error)).toBe(true);
     });
     it('getLevel others', () => {
       const log1 = new Logger(5);
       expect(log1.getLevel()).toBe(5);
-      const log2 = new Logger(LogLevel.verbose);
+      const log2 = new Logger(logLevel.verbose);
       expect(log2.getLevel()).toBe(5);
-      expect(log2.isEnabledFor(LogLevel.trace)).toBe(false);
-      expect(log2.isEnabledFor(LogLevel.debug)).toBe(false);
-      expect(log2.isEnabledFor(LogLevel.verbose)).toBe(true);
-      expect(log2.isEnabledFor(LogLevel.info)).toBe(true);
-      expect(log2.isEnabledFor(LogLevel.warn)).toBe(true);
-      expect(log2.isEnabledFor(LogLevel.error)).toBe(true);
+      expect(log2.isEnabledFor(logLevel.trace)).toBe(false);
+      expect(log2.isEnabledFor(logLevel.debug)).toBe(false);
+      expect(log2.isEnabledFor(logLevel.verbose)).toBe(true);
+      expect(log2.isEnabledFor(logLevel.info)).toBe(true);
+      expect(log2.isEnabledFor(logLevel.warn)).toBe(true);
+      expect(log2.isEnabledFor(logLevel.error)).toBe(true);
     });
   });
   describe('text', () => {
@@ -59,7 +59,7 @@ describe('log', () => {
     let log: Logger;
 
     beforeEach(() => {
-      log = new Logger(LogLevel.debug);
+      log = new Logger(logLevel.debug);
       log.mock.enable = true;
       log.mock.value = [];
     });
@@ -82,10 +82,10 @@ describe('log', () => {
 
   describe('setLevel', () => {
     it('should change log level', () => {
-      const log = new Logger(LogLevel.info);
-      expect(log.isEnabledFor(LogLevel.debug)).toBe(false);
-      log.setLevel(LogLevel.debug);
-      expect(log.isEnabledFor(LogLevel.debug)).toBe(true);
+      const log = new Logger(logLevel.info);
+      expect(log.isEnabledFor(logLevel.debug)).toBe(false);
+      log.setLevel(logLevel.debug);
+      expect(log.isEnabledFor(logLevel.debug)).toBe(true);
     });
   });
 });
