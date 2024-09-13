@@ -113,11 +113,21 @@ describe('log', () => {
 
     beforeEach(() => {
       log = new Logger({
-        level: logLevel.debug,
+        level: logLevel.trace,
         levelPrefix: true,
         timePrefix: 'utc',
         keepLines: true
       });
+    });
+
+    it('should prefix trace messages', () => {
+      log.trace('Trace message');
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[TRACE\]   Trace message$/);
+    });
+
+    it('should fail to output trace message', () => {
+      log.setLevel('debug').trace('Trace message');
+      expect(log.lines.length).toEqual(0);
     });
 
     it('should prefix debug messages', () => {
@@ -126,13 +136,18 @@ describe('log', () => {
     });
 
     it('should prefix info messages', () => {
-      log.info('Info message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[INFO\]    Info message$/);
+      log.verbose('Verbose message');
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[VERBOSE\] Verbose message$/);
+    });
+
+    it('should should fail to output info message', () => {
+      log.setLevel('info').verbose('Verbose message');
+      expect(log.lines.length).toEqual(0);
     });
 
     it('should prefix info messages', () => {
-      log.verbose('Verbose message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[VERBOSE\] Verbose message$/);
+      log.info('Info message');
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[INFO\]    Info message$/);
     });
 
     it('should prefix warn messages', () => {
