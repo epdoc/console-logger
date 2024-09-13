@@ -20,8 +20,10 @@ export const styles: Record<string, StyleDef> = {
   value: { fg: Color.blue },
   path: { fg: Color.dark_blue },
   date: { fg: Color.purple },
-  error: { fg: Color.dark_red },
-  warn: { fg: Color.cyan },
+  critical: { fg: Color.cyan },
+  fatal: { fg: Color.dark_red },
+  levelPrefix: { fg: Color.gray },
+  timePrefix: { fg: Color.gray },
   strikethru: { fg: Color.inverse }
 };
 export type StyleName = keyof typeof styles;

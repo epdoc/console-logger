@@ -1,6 +1,7 @@
 # console-logger
 
-A console logger with color support and method chaining.
+A simple, customizable console logger for Node.js with terminal color support
+and method chaining.
 
 ## Features
 
@@ -28,6 +29,33 @@ log.style.enable(true);
 
 log.info('Hello, world!');
 ```
+
+### Type Safety for Dynamic Methods
+
+When creating a logger instance, we recommend using:
+
+```typescript
+const log: LoggerInstance = new Logger();
+```
+
+instead of:
+
+```typescript
+const log = new Logger();
+```
+
+The `LoggerInstance` type includes all the dynamically added style methods (like
+`h1`, `h2`, `text`, etc.) that are not part of the original `Logger` class
+definition. These methods are added at runtime, but TypeScript needs to know
+about them at compile time.
+
+By using `LoggerInstance`, you get full type safety and autocompletion for all
+logger methods, including the dynamically added ones. This approach combines the
+flexibility of runtime method creation with the benefits of static typing.
+
+Runtime loading of methods also allows for custom styles to be added, which is
+demonstrated in the [Custom Styles](#custom-styles) section below.
+
 
 ### Changing Log Level
 

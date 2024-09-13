@@ -1,19 +1,12 @@
 import { Integer, isInteger } from '@epdoc/typeutil';
 
-let tLast = performance.now();
-let tStart = tLast;
-
-export function elapsedTime(): string {
-  let now = performance.now();
-  let t0: number = (now - tLast) / 1000;
-  let t1: number = (now - tStart) / 1000;
-  tLast = now;
-  let s0 = t0.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-  let s1 = t1.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-  return `${s1} (${s0})`;
-  // return stylize(`${s1} (${s0})`, styles.elapsed);
-}
-
+/**
+ * Returns the plural form of a word based on the given count.
+ * @param {string} singular - The singular form of the word.
+ * @param {Integer} n - The count of items.
+ * @param {string} [plural] - The plural form of the word (optional).
+ * @returns {string} The plural form of the word.
+ */
 export function plural(singular: string, n: Integer, plural?: string) {
   if (n === 1) {
     return singular;
