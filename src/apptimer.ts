@@ -6,12 +6,12 @@ export type Microseconds = number;
  * Represents the elapsed time since the start of the program with total and
  * delta properties, where delta is the time since the last call to elapsedTime.
  */
-export type ElapsedTime = {
+export type AppTimerValues = {
   total: Milliseconds;
   interval: Milliseconds;
 };
 
-export type ElapsedTimeString = {
+export type AppTimerStrings = {
   total: string;
   interval: string;
 };
@@ -24,13 +24,17 @@ function formatTime(time: Milliseconds): string {
  * Measures elapsed time with total and interval properties. Measures in
  * microseconds.
  */
-export class Elapsed {
-  private _startTime: Microseconds;
-  private _lastMeasurement: Microseconds;
+export class AppTimer {
+  protected _startTime: Microseconds;
+  protected _lastMeasurement: Microseconds;
 
   constructor() {
-    this._startTime = performance.now();
+    this._startTime = this.now();
     this._lastMeasurement = this._startTime;
+  }
+
+  protected now(): Microseconds {
+    return performance.now();
   }
 
   /**
@@ -38,7 +42,7 @@ export class Elapsed {
    * @returns {this} The current instance for method chaining.
    */
   resetAll(): this {
-    this._startTime = performance.now();
+    this._startTime = this.now();
     this._lastMeasurement = this._startTime;
     return this;
   }
@@ -48,16 +52,16 @@ export class Elapsed {
    * @returns {this} The current instance for method chaining.
    */
   resetInterval(): this {
-    this._lastMeasurement = performance.now();
+    this._lastMeasurement = this.now();
     return this;
   }
 
   /**
    * Measures the elapsed time since the start and last measurement.
-   * @returns {ElapsedTime} An object containing total and interval elapsed times in milliseconds.
+   * @returns {AppTimerValues} An object containing total and interval elapsed times in milliseconds.
    */
-  measure(): ElapsedTime {
-    const now: Microseconds = performance.now();
+  measure(): AppTimerValues {
+    const now: Microseconds = this.now();
     const result = {
       total: (now - this._startTime) / 1000,
       interval: (now - this._lastMeasurement) / 1000
@@ -68,9 +72,9 @@ export class Elapsed {
 
   /**
    * Measures the elapsed time and returns it as formatted strings.
-   * @returns {ElapsedTimeString} An object containing formatted total and interval elapsed times.
+   * @returns {AppTimerStrings} An object containing formatted total and interval elapsed times.
    */
-  measureFormatted(): ElapsedTimeString {
+  measureFormatted(): AppTimerStrings {
     const result = this.measure();
     return {
       total: formatTime(result.total),
@@ -83,4 +87,4 @@ export class Elapsed {
  * Measures elapsed time with total and interval properties. Measures in
  * microseconds. Initialized at construction.
  */
-export const elapsed = new Elapsed();
+export const appTimer = new AppTimer();

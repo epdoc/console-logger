@@ -23,9 +23,7 @@ npm install @epdoc/console-logger
 import { Logger } from '@epdoc/console-logger';
 
 // Declare one global logger instance and import it wherever you need to log
-const log:LoggerInstance = new Logger();
-// Enable color output
-log.style.enable(true);
+const log:LoggerInstance = new Logger({enableStyles:true});
 
 log.info('Hello, world!');
 ```
@@ -59,12 +57,30 @@ demonstrated in the [Custom Styles](#custom-styles) section below.
 
 ### Changing Log Level
 
-The default log level is `LogLevel.info`. You can change the log level at any time using the `setLevel` method.
+The default log level is `LogLevel.info`. You can change the log level in the
+constructor or at any time using the `setLevel` method.
 
 ```typescript
 log.setLevel(LogLevel.debug);
 log.debug('Now this debug message will be shown');
 ```
+
+
+### Using Prefixes
+
+You can enable level and time prefixes when initializing the logger:
+
+```typescript
+const log:LoggerInstance = new Logger({ levelPrefix: true, timePrefix: 'local' });
+log.info('Hello'); // Outputs: "14:30:45 [INFO] Hello"
+```
+
+The timePrefix can be one of the following values:
+
+- `'local'` - local time
+- `'utc'` - UTC time
+- `'elapsed'` - elapsed time since application start
+- `false` - no time prefix
 
 ### Chaining Methods
 
@@ -76,26 +92,26 @@ called.
 log.text('User:').value('John Doe').info('logged in');
 ```
 
-### Using Elapsed Time
+### Using Elapsed Time Suffic
 
 The elapsed time since application start, and the time since the last call to
-elapsed() are appended to the output.
+elapsed() can be appended to the output.
 
 ```typescript
 log.h1('Starting operation').info();
 // ... some code ...
-log.res('Operation completed').elapsed().info();
+log.tab().text('Operation completed').elapsed().info();
 ```
 
 ### Using Indentation
 
 ```typescript
 log.indent().info('This is indented by the default 2 spaces');
-log.res('This is also indented by 2 spaces').info();
+log.tab().text('This is also indented by 2 spaces').info();
 log.indent('>>').info('This is indented by ">> "');
 log.indent(4).info('This is indented by 4 spaces');
-log.res2('This is also indented by 4 spaces').info();
-log.res2().info('This is also indented by 4 spaces');
+log.tab(2).text('This is also indented by 4 spaces').info();
+log.tab(2).info('This is also indented by 4 spaces');
 log.info('This is not indented');
 ```
 
@@ -106,66 +122,17 @@ log.h1('Big Header').info('This is a big header');
 log.h2('Smaller Header').info('This is a smaller header');
 ```
 
-### Mock Mode for Testing
+### Lines for Testing or just because
+
+If you want to collect lines for testing or just because, you can use the
+`setKeepLines` method or initialize the logger with `keepLines: true`.
 
 ```typescript
-log.mock.enable = true;
+log.setKeepLines(true);
 log.info('Test message');
-console.log(log.mock.value); // ['Test message']
+log.info('Test message 2');
+console.log(log.lines); // ['Test message', 'Test message 2']
 ```
-
-## API Reference
-
-### Logger Class
-
-- `constructor(level: LogLevel = LogLevel.info)`
-- `setLevel(level: LogLevel | string): this`
-- `getLevel(): LogLevel`
-- `style: Style` (setter and getter)
-- `isEnabledFor(level: LogLevel): boolean`
-- `elapsed(): this`
-- `clear(): this`
-
-#### Methods for Pre-formatted Text
-
-- `text(...args: any[]): this`
-- `data(arg: any): this`
-- `h1(...args: any[]): this`
-- `h2(...args: any[]): this`
-- `h3(...args: any[]): this`
-- `label(...args: any[]): this`
-- `action(...args: any[]): this`
-- `value(...args: any[]): this`
-- `path(...args: any[]): this`
-- `date(arg: any): this`
-- `alert(arg: any): this`
-- `warn(...args: any[]): this`
-- `error(...args: any[]): this`
-- `stylize(style: StyleName | StyleDef, ...args: any[]): this`
-- `res(...args: any[]): this`
-- `res2(...args: any[]): this`
-- `indent(n: Integer = 2): this`
-
-#### Methods for Output
-
-- `trace(...args: any[]): this`
-- `debug(...args: any[]): this`
-- `verbose(...args: any[]): this`
-- `info(...args: any[]): this`
-- `output(...args: any[]): this`
-
-### LogLevel Enum
-
-- `trace = 1`
-- `debug = 3`
-- `verbose = 5`
-- `info = 7`
-- `warn = 8`
-- `error = 9`
-
-## License
-
-This project is licensed under the MIT License.
 
 ## Custom Styles
 
@@ -186,7 +153,7 @@ critical: { fg: Color.red, bg: Color.white },
 2. Pass the custom styles when creating a new logger instance:
 
 ```typescript
-const log = new Logger({
+const log:LoggerInstance = new Logger({
 level: LogLevel.info,
 styles: customStyles
 });
@@ -198,5 +165,68 @@ log.success('Operation completed successfully');
 log.warning('Proceed with caution');
 log.critical('System failure detected');
 ```
-Custom styles will be merged with default styles, overwriting any conflicts.
+
+
+## API Reference
+
+### Logger Class
+
+- `constructor({level: LogLevel = LogLevel.info, keepLines: boolean = false, timePrefix: 'local' | 'utc' | 'elapsed' | false = 'local', levelPrefix: boolean = false})`
+- `setLevel(level: LogLevel | string): this`
+- `getLevel(): LogLevel`
+- `isEnabledFor(level: LogLevel): boolean`
+- `setStyle(style: Style): this`
+- `getStyle(): Style`
+- `setLevelPrefix(val: boolean): this`
+- `setTimePrefix(val: TimePrefix): this`
+- `setElapsed(val: Elapsed): this`
+- `setKeepLines(val: boolean): this`
+- `elapsed(): this`
+- `clearLines(): this`
+- `clearLine(): this`
+
+#### Methods for Pre-formatted Text, using declared styles
+
+- `text(...args: any[]): this`
+- `data(arg: any): this`
+- `h1(...args: any[]): this`
+- `h2(...args: any[]): this`
+- `h3(...args: any[]): this`
+- `label(...args: any[]): this`
+- `action(...args: any[]): this`
+- `value(...args: any[]): this`
+- `path(...args: any[]): this`
+- `critical(...args: any[]): this`
+- `fatal(...args: any[]): this`
+
+#### Support methods for Pre-formatted Text, regardless of styles
+
+- `data(arg: any): this`
+- `stylize(style: StyleName | StyleDef, ...args: any[]): this`
+- `tab(val: Integer = 2): this`
+- `indent(n: Integer = 2): this`
+
+#### Methods for Output
+
+- `trace(...args: any[]): this`
+- `debug(...args: any[]): this`
+- `verbose(...args: any[]): this`
+- `info(...args: any[]): this`
+- `warn(...args: any[]): this`
+- `error(...args: any[]): this`
+- `output(...args: any[]): this`
+
+### LogLevel Enum
+
+- `trace = 1`
+- `debug = 3`
+- `verbose = 5`
+- `info = 7`
+- `warn = 8`
+- `error = 9`
+
+## License
+
+This project is licensed under the MIT License.
+
 

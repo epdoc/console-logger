@@ -1,6 +1,6 @@
 import { dateUtil } from '@epdoc/timeutil';
 import { asInt, Integer, isBoolean, isInteger, isNonEmptyString, isString } from '@epdoc/typeutil';
-import { Elapsed, elapsed } from './elapsed';
+import { AppTimer, appTimer } from './apptimer';
 import { Style, StyleDef, StyleName, StyleOptions } from './style';
 
 const REG = {
@@ -45,15 +45,25 @@ export function isValidTimePrefix(val: any): val is TimePrefix {
 }
 
 /**
- * Options for the Logger class that are applied across all logger output lines.
+ * Configuration options for the Logger.
+ * @typedef {Object} LoggerOptions
+ * @property {boolean} [enableStyles] - Whether to enable styling of console messages. Defaults to false.
+ * @property {Style} [style] - Custom Style instance to use for formatting. Defaults to the default style.
+ * @property {LogLevel | LogLevelValue} [level] - The minimum log level to output.
+ * @property {Integer} [tab] - The number of spaces to use for indentation. Defaults to 2.
+ * @property {boolean} [levelPrefix] - Whether to prefix log messages with their level. Defaults to false.
+ * @property {TimePrefix} [timePrefix] - The type of time prefix to use ('local', 'utc', 'elapsed', or false). Defaults to false.
+ * @property {AppTimer} [elapsed] - Custom Elapsed instance for tracking time. Defaults to the elapsed time object.
+ * @property {boolean} [keepLines] - Whether to keep log lines in memory instead of outputting immediately. Defaults to false.
  */
 export type LoggerOptions = StyleOptions & {
+  enableStyles?: boolean;
   style?: Style;
   level?: LogLevel | LogLevelValue;
   tab?: Integer;
   levelPrefix?: boolean;
   timePrefix?: TimePrefix;
-  elapsed?: Elapsed;
+  elapsed?: AppTimer;
   keepLines?: boolean;
 };
 
@@ -71,7 +81,7 @@ export class Logger {
   protected _tab: Integer = 2;
   protected _levelPrefix = false;
   protected _timePrefix: TimePrefix = false;
-  protected _elapsed: Elapsed = elapsed;
+  protected _elapsed: AppTimer = new AppTimer();
   protected _pre: string[] = [];
   protected _showElapsed = false;
   protected _keepLines = false;
@@ -79,8 +89,8 @@ export class Logger {
   [key: string]: ((val: any) => this) | any;
 
   /**
-   * Creates a new Logger instance using the default style.
-   * @param {LogLevel} level - The initial log level (default: LogLevel.info).
+   * Constructor for the Logger class.
+   * @param {LoggerOptions} options - The options for the logger.
    */
   constructor(
     options: LoggerOptions = {
@@ -88,8 +98,9 @@ export class Logger {
       tab: 2,
       levelPrefix: false,
       timePrefix: 'local',
-      elapsed: elapsed,
-      keepLines: false
+      elapsed: appTimer,
+      keepLines: false,
+      enableStyles: false
     }
   ) {
     this.setLevel(options.level)
@@ -99,6 +110,9 @@ export class Logger {
       .setTimePrefix(options.timePrefix)
       .setElapsed(options.elapsed)
       .setKeepLines(options.keepLines);
+    if (options.enableStyles === true) {
+      this._style.enable(true);
+    }
     this.addStyleMethods();
   }
 
@@ -121,6 +135,10 @@ export class Logger {
     return this._style;
   }
 
+  /**
+   * Gets the lines stored in memory. Only applicable if keepLines is true.
+   * @returns {string[]} The lines stored in memory.
+   */
   get lines(): string[] {
     return this._lines;
   }
@@ -158,23 +176,43 @@ export class Logger {
     return this;
   }
 
+  /**
+   * Sets the number of spaces to use for indentation.
+   * @param {Integer} val - The number of spaces to use for indentation.
+   * @returns {this} The Logger instance.
+   */
   setTab(val: Integer): this {
     this._tab = isInteger(val) ? val : this._tab;
     return this;
   }
 
+  /**
+   * Sets the time prefix.
+   * @param {TimePrefix} val - The time prefix to set.
+   * @returns {this} The Logger instance.
+   */
   setTimePrefix(val: TimePrefix): this {
     this._timePrefix = isValidTimePrefix(val) ? val : this._timePrefix;
     return this;
   }
 
-  setElapsed(val: Elapsed): this {
-    if (val instanceof Elapsed) {
+  /**
+   * Sets the elapsed time object.
+   * @param {AppTimer} val - The elapsed time object to set.
+   * @returns {this} The Logger instance.
+   */
+  setElapsed(val: AppTimer): this {
+    if (val instanceof AppTimer) {
       this._elapsed = val;
     }
     return this;
   }
 
+  /**
+   * Sets whether to keep lines in memory rather than outputting them immediately to the console.
+   * @param {boolean} val - Whether to keep lines in memory.
+   * @returns {this} The Logger instance.
+   */
   setKeepLines(val: boolean): this {
     if (isBoolean(val)) {
       this._keepLines = val;
@@ -294,10 +332,15 @@ export class Logger {
     return this;
   }
 
-  addStyleMethods() {
+  /**
+   * Adds our dynamic style methods to the logger instance.
+   * @returns {void}
+   */
+  addStyleMethods(): this {
     for (const name in this._style.styles) {
       (this as any)[name] = (...args: any[]) => this.stylize(name, ...args);
     }
+    return this;
   }
 
   /**
@@ -344,12 +387,22 @@ export class Logger {
     }
   }
 
+  /**
+   * Outputs a warn level log message if the current log level allows it.
+   * @param {...any[]} args - The message arguments to log.
+   * @returns {this} The Logger instance.
+   */
   warn(...args): this {
     if (this._level <= logLevel.warn) {
       return this.addPrefix('warn').output(...args);
     }
   }
 
+  /**
+   * Outputs an error level log message if the current log level allows it.
+   * @param {...any[]} args - The message arguments to log.
+   * @returns {this} The Logger instance.
+   */
   error(...args): this {
     if (this._level <= logLevel.error) {
       return this.addPrefix('error').output(...args);
@@ -363,7 +416,7 @@ export class Logger {
     if (this._timePrefix) {
       let time = '';
       if (this._timePrefix === 'elapsed') {
-        time = elapsed.measureFormatted().total;
+        time = appTimer.measureFormatted().total;
       } else if (this._timePrefix === 'local') {
         time = dateUtil(Date.now()).format('HH:mm:ss');
       } else if (this._timePrefix === 'utc') {
