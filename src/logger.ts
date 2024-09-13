@@ -44,6 +44,9 @@ export function isValidTimePrefix(val: any): val is TimePrefix {
   return ['local', 'utc', 'elapsed', false].includes(val);
 }
 
+const rightPadAndTruncate = (str: string, length: Integer, char = ' ') => {
+  return str.length > length ? str.slice(0, length - 1) : str + char.repeat(length - str.length);
+};
 /**
  * Configuration options for the Logger.
  * @typedef {Object} LoggerOptions
@@ -63,7 +66,7 @@ export type LoggerOptions = StyleOptions & {
   tab?: Integer;
   levelPrefix?: boolean;
   timePrefix?: TimePrefix;
-  elapsed?: AppTimer;
+  appTimer?: AppTimer;
   keepLines?: boolean;
 };
 
@@ -81,7 +84,7 @@ export class Logger {
   protected _tab: Integer = 2;
   protected _levelPrefix = false;
   protected _timePrefix: TimePrefix = false;
-  protected _elapsed: AppTimer = new AppTimer();
+  protected _appTimer: AppTimer = new AppTimer();
   protected _pre: string[] = [];
   protected _showElapsed = false;
   protected _keepLines = false;
@@ -98,7 +101,7 @@ export class Logger {
       tab: 2,
       levelPrefix: false,
       timePrefix: 'local',
-      elapsed: appTimer,
+      appTimer: appTimer,
       keepLines: false,
       enableStyles: false
     }
@@ -108,7 +111,7 @@ export class Logger {
       .setLevelPrefix(options.levelPrefix)
       .setTab(options.tab)
       .setTimePrefix(options.timePrefix)
-      .setElapsed(options.elapsed)
+      .setAppTimer(options.appTimer)
       .setKeepLines(options.keepLines);
     if (options.enableStyles === true) {
       this._style.enable(true);
@@ -131,7 +134,7 @@ export class Logger {
    * Gets the current style.
    * @returns {Style} The current style.
    */
-  getStyle(): Style {
+  get style(): Style {
     return this._style;
   }
 
@@ -160,7 +163,7 @@ export class Logger {
    * Gets the current log level.
    * @returns {LogLevel} The current log level.
    */
-  getLevel(): LogLevelValue {
+  get level(): LogLevelValue {
     return this._level;
   }
 
@@ -201,9 +204,9 @@ export class Logger {
    * @param {AppTimer} val - The elapsed time object to set.
    * @returns {this} The Logger instance.
    */
-  setElapsed(val: AppTimer): this {
+  setAppTimer(val: AppTimer): this {
     if (val instanceof AppTimer) {
-      this._elapsed = val;
+      this._appTimer = val;
     }
     return this;
   }
@@ -233,7 +236,8 @@ export class Logger {
   }
 
   /**
-   * Enables elapsed time logging for this line of output.
+   * Enables elapsed time logging for this line of output, which will result in
+   * the elapsed time being output at the end the log line.
    * @returns {this} The Logger instance.
    * @throws {Error} If elapsed time logging is already enabled.
    */
@@ -352,6 +356,7 @@ export class Logger {
     if (this._level <= logLevel.trace) {
       return this.addPrefix('trace').output(...args);
     }
+    return this.clearLine();
   }
 
   /**
@@ -363,6 +368,7 @@ export class Logger {
     if (this._level <= logLevel.debug) {
       return this.addPrefix('debug').output(...args);
     }
+    return this.clearLine();
   }
 
   /**
@@ -374,6 +380,7 @@ export class Logger {
     if (this._level <= logLevel.verbose) {
       return this.addPrefix('verbose').output(...args);
     }
+    return this.clearLine();
   }
 
   /**
@@ -385,6 +392,7 @@ export class Logger {
     if (this._level <= logLevel.info) {
       return this.addPrefix('info').output(...args);
     }
+    return this.clearLine();
   }
 
   /**
@@ -396,6 +404,7 @@ export class Logger {
     if (this._level <= logLevel.warn) {
       return this.addPrefix('warn').output(...args);
     }
+    return this.clearLine();
   }
 
   /**
@@ -407,11 +416,15 @@ export class Logger {
     if (this._level <= logLevel.error) {
       return this.addPrefix('error').output(...args);
     }
+    return this.clearLine();
   }
 
   protected addPrefix(level: string) {
+    function truncateStringToFirst8chars(s: string) {}
+
     if (this._levelPrefix === true) {
-      this._pre.unshift(this._style.levelPrefix(`[${level.toUpperCase()}]`));
+      let str = `[${level.toUpperCase()}]`;
+      this._pre.unshift(this._style.levelPrefix(rightPadAndTruncate(str, 9)));
     }
     if (this._timePrefix) {
       let time = '';
@@ -436,13 +449,13 @@ export class Logger {
     if (this._keepLines) {
       let line = [...this._pre, ...args].join(' ');
       if (this._showElapsed) {
-        const et = this._elapsed.measureFormatted();
+        const et = this._appTimer.measureFormatted();
         line += ' ' + `${et.total} (${et.interval})`;
       }
       this._lines.push(line);
     } else {
       if (this.showElapsed) {
-        const et = this._elapsed.measureFormatted();
+        const et = this._appTimer.measureFormatted();
         console.log(...this._pre, ...args, `${et.total} (${et.interval})`);
       } else {
         console.log(...this._pre, ...args);

@@ -5,7 +5,7 @@ describe('log', () => {
   describe('constructor', () => {
     it('getLevel default', () => {
       const log1: LoggerInstance = new Logger({ keepLines: true });
-      expect(log1.getLevel()).toBe(7);
+      expect(log1.level).toBe(7);
       expect(log1.isEnabledFor(logLevel.trace)).toBe(false);
       expect(log1.isEnabledFor(logLevel.debug)).toBe(false);
       expect(log1.isEnabledFor(logLevel.verbose)).toBe(false);
@@ -15,9 +15,9 @@ describe('log', () => {
     });
     it('getLevel others', () => {
       const log1: LoggerInstance = new Logger({ level: 5, keepLines: true });
-      expect(log1.getLevel()).toBe(5);
+      expect(log1.level).toBe(5);
       const log2: LoggerInstance = new Logger({ level: logLevel.verbose, keepLines: true });
-      expect(log2.getLevel()).toBe(5);
+      expect(log2.level).toBe(5);
       expect(log2.isEnabledFor(logLevel.trace)).toBe(false);
       expect(log2.isEnabledFor(logLevel.debug)).toBe(false);
       expect(log2.isEnabledFor(logLevel.verbose)).toBe(true);
@@ -122,27 +122,32 @@ describe('log', () => {
 
     it('should prefix debug messages', () => {
       log.debug('Debug message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[DEBUG\] Debug message$/);
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[DEBUG\]   Debug message$/);
     });
 
     it('should prefix info messages', () => {
       log.info('Info message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[INFO\] Info message$/);
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[INFO\]    Info message$/);
+    });
+
+    it('should prefix info messages', () => {
+      log.verbose('Verbose message');
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[VERBOSE\] Verbose message$/);
     });
 
     it('should prefix warn messages', () => {
       log.warn('Warning message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[WARN\] Warning message$/);
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[WARN\]    Warning message$/);
     });
 
     it('should prefix error messages', () => {
       log.error('Error message');
-      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[ERROR\] Error message$/);
+      expect(log.lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} \[ERROR\]   Error message$/);
     });
 
     it('should work with style methods', () => {
       log.setTimePrefix(false).h2('Header').info('Styled message');
-      expect(log.lines).toEqual(['[INFO] Header Styled message']);
+      expect(log.lines).toEqual(['[INFO]    Header Styled message']);
     });
 
     it('should not prefix when levelPrefix is false', () => {

@@ -22,8 +22,8 @@ export const styles: Record<string, StyleDef> = {
   date: { fg: Color.purple },
   critical: { fg: Color.cyan },
   fatal: { fg: Color.dark_red },
-  levelPrefix: { fg: Color.gray },
-  timePrefix: { fg: Color.gray },
+  levelPrefix: { fg: Color.dark_gray },
+  timePrefix: { fg: Color.dark_gray },
   strikethru: { fg: Color.inverse }
 };
 export type StyleName = keyof typeof styles;
