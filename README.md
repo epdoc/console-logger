@@ -22,7 +22,8 @@ npm install @epdoc/console-logger
 import { Logger } from '@epdoc/console-logger';
 
 // Declare one global logger instance and import it wherever you need to log
-const log = new Logger();
+const log:LoggerInstance = new Logger();
+// Enable color output
 log.style.enable(true);
 
 log.info('Hello, world!');
@@ -137,3 +138,37 @@ console.log(log.mock.value); // ['Test message']
 ## License
 
 This project is licensed under the MIT License.
+
+## Custom Styles
+
+You can provide your own custom styles when initializing the logger. Here's how:
+
+1. Define your custom styles:
+
+```typescript
+import { StyleDef, Color } from 'your-logger-package';
+const customStyles: Record<string, StyleDef> = {
+success: { fg: Color.green },
+warning: { fg: Color.yellow },
+critical: { fg: Color.red, bg: Color.white },
+// Add more custom styles as needed
+};
+```
+
+2. Pass the custom styles when creating a new logger instance:
+
+```typescript
+const log = new Logger({
+level: LogLevel.info,
+styles: customStyles
+});
+```
+
+3. Use your custom styles in your logs:
+```typescript
+log.success('Operation completed successfully');
+log.warning('Proceed with caution');
+log.critical('System failure detected');
+```
+Custom styles will be merged with default styles, overwriting any conflicts.
+

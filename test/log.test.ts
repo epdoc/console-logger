@@ -1,9 +1,9 @@
-import { Logger, logLevel } from '../src';
+import { Logger, LoggerInstance, logLevel } from '../src';
 
 describe('log', () => {
   describe('constructor', () => {
     it('getLevel default', () => {
-      const log1 = new Logger();
+      const log1: LoggerInstance = new Logger();
       expect(log1.getLevel()).toBe(7);
       expect(log1.isEnabledFor(logLevel.trace)).toBe(false);
       expect(log1.isEnabledFor(logLevel.debug)).toBe(false);
@@ -13,9 +13,9 @@ describe('log', () => {
       expect(log1.isEnabledFor(logLevel.error)).toBe(true);
     });
     it('getLevel others', () => {
-      const log1 = new Logger(5);
+      const log1: LoggerInstance = new Logger({ level: 5 });
       expect(log1.getLevel()).toBe(5);
-      const log2 = new Logger(logLevel.verbose);
+      const log2: LoggerInstance = new Logger({ level: logLevel.verbose });
       expect(log2.getLevel()).toBe(5);
       expect(log2.isEnabledFor(logLevel.trace)).toBe(false);
       expect(log2.isEnabledFor(logLevel.debug)).toBe(false);
@@ -26,7 +26,7 @@ describe('log', () => {
     });
   });
   describe('text', () => {
-    const log1 = new Logger(5);
+    const log1: LoggerInstance = new Logger({ level: 5 });
     log1.mock.enable = true;
     log1.mock.value = [];
 
@@ -34,7 +34,7 @@ describe('log', () => {
     expect(log1.mock.value).toEqual(['  hello']);
   });
   describe('text2', () => {
-    const log1 = new Logger(5);
+    const log1: LoggerInstance = new Logger({ level: 5 });
     log1.mock.enable = true;
     log1.mock.value = [];
 
@@ -59,7 +59,7 @@ describe('log', () => {
     let log: Logger;
 
     beforeEach(() => {
-      log = new Logger(logLevel.debug);
+      log = new Logger({ level: logLevel.debug });
       log.mock.enable = true;
       log.mock.value = [];
     });
@@ -82,7 +82,7 @@ describe('log', () => {
 
   describe('setLevel', () => {
     it('should change log level', () => {
-      const log = new Logger(logLevel.info);
+      const log = new Logger({ level: logLevel.info });
       expect(log.isEnabledFor(logLevel.debug)).toBe(false);
       log.setLevel(logLevel.debug);
       expect(log.isEnabledFor(logLevel.debug)).toBe(true);

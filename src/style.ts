@@ -8,7 +8,8 @@ export type StyleDef = {
 };
 
 export const styles: Record<string, StyleDef> = {
-  default: { fg: Color.white },
+  // default: { fg: Color.white },
+  text: { fg: Color.white },
   h1: { fg: Color.magenta },
   h2: { fg: Color.magenta },
   h3: { fg: Color.green },
@@ -25,9 +26,25 @@ export const styles: Record<string, StyleDef> = {
 };
 export type StyleName = keyof typeof styles;
 
+export type StyleOptions = {
+  styles?: Record<string, StyleDef>;
+};
+
 export class Style {
   protected colorFormat: boolean = false;
-  public readonly styles: Record<string, StyleDef> = Object.assign({}, styles);
+  public readonly styles: Record<string, StyleDef>;
+  [key: string]: ((val: any) => string) | any;
+
+  constructor(options: StyleOptions = {}) {
+    this.styles = Object.assign({}, options.styles ? options.styles : styles);
+    this.addStyleMethods();
+  }
+
+  addStyleMethods() {
+    for (const name in this.styles) {
+      (this as any)[name] = (val: any) => this.format(val, name);
+    }
+  }
 
   /**
    * Enables or disables color formatting.
@@ -48,7 +65,8 @@ export class Style {
     this.styles[name] = styleDef;
   }
 
-  format(val: any, styleDef: StyleDef): string {
+  format(val: any, style: StyleName | StyleDef): string {
+    let styleDef = typeof style === 'string' ? this.styles[style] : style;
     let s = '';
     if (isDict(val) || isArray(val)) {
       s = JSON.stringify(val);
@@ -75,54 +93,5 @@ export class Style {
   }
 }
 
-// export type StyleName = keyof typeof styles;
-
-// type StyleFunction = (s: any) => string;
-// export const Style: Record<StyleName, StyleFunction> = {
-//   default: (s: any) => {
-//     return stylize(s, { fg: Color.white });
-//   },
-//   h1: (s: any) => {
-//     return stylize(s, { fg: Color.magenta });
-//   },
-//   h2: (s: any) => {
-//     return stylize(s, { fg: Color.magenta });
-//   },
-//   h3: (s: any) => {
-//     return stylize(s, { fg: Color.green });
-//   },
-//   action: (s: any) => {
-//     return stylize(s, { fg: Color.black, bg: Color.orange });
-//   },
-//   elapsed: (s: any) => {
-//     return stylize(s, { fg: Color.dark_gray });
-//   },
-//   label: (s: any) => {
-//     return stylize(s, { fg: Color.teal });
-//   },
-//   highlight: (s: any) => {
-//     return stylize(s, { fg: Color.purple });
-//   },
-//   value: (s: any) => {
-//     return stylize(s, { fg: Color.blue });
-//   },
-//   path: (s: any) => {
-//     return stylize(s, { fg: Color.dark_blue });
-//   },
-//   date: (s: any) => {
-//     return stylize(s, { fg: Color.purple });
-//   },
-//   error: (s: any) => {
-//     return stylize(s, { fg: Color.dark_red });
-//   },
-//   warn: (s: any) => {
-//     return stylize(s, { fg: Color.cyan });
-//   },
-//   strikethru: (s: any) => {
-//     return stylize(s, { fg: Color.inverse });
-//   }
-// };
-
-// export function color(s: string, c: Color, opts?: ColorOpts): string {
-//   return s;
-// }
+// Add this type declaration
+export type StyleInstance = Style & Record<StyleName, (val: any) => string>;

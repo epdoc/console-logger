@@ -1,5 +1,5 @@
 import { asInt, Integer, isInteger, isNonEmptyString, isString } from '@epdoc/typeutil';
-import { Style, StyleDef, StyleName } from './style';
+import { Style, StyleDef, StyleName, StyleOptions } from './style';
 import { elapsedTime } from './util';
 
 const REG = {
@@ -37,6 +37,10 @@ export function isLogLevelValue(val: any): val is LogLevelValue {
   return [1, 3, 5, 7, 8, 9].includes(val);
 }
 
+export type LoggerOptions = StyleOptions & {
+  level?: LogLevel | LogLevelValue;
+};
+
 /**
  * Logger class
  * @example
@@ -47,9 +51,10 @@ export function isLogLevelValue(val: any): val is LogLevelValue {
  */
 export class Logger {
   protected _style: Style;
-  protected _level: LogLevelValue = logLevel.info;
+  protected _level: LogLevelValue;
   protected _elapsed = false;
   protected _pre: string[] = [];
+  [key: string]: ((val: any) => this) | any;
   public mock = {
     enable: false,
     value: []
@@ -59,10 +64,11 @@ export class Logger {
    * Creates a new Logger instance using the default style.
    * @param {LogLevel} level - The initial log level (default: LogLevel.info).
    */
-  constructor(level: LogLevelValue | LogLevel = logLevel.info) {
-    this.setLevel(level);
+  constructor(options: LoggerOptions = { level: logLevel.info }) {
+    this.setLevel(options.level);
     // Set the default style
-    this._style = new Style();
+    this._style = new Style(options);
+    this.addStyleMethods();
   }
 
   /**
@@ -139,17 +145,8 @@ export class Logger {
   }
 
   /**
-   * Adds unformatted text to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  text(...args: any[]): this {
-    this._pre.push(args.join(' '));
-    return this;
-  }
-
-  /**
-   * Adds stringified data to the log message.
+   * Adds stringified data to the log message. This text will be formatted with
+   * the default style.
    * @param {any} arg - The data to stringify and add.
    * @returns {this} The Logger instance.
    */
@@ -173,10 +170,20 @@ export class Logger {
   }
 
   /**
+   * Indents the log message.
+   * @param {Integer | string} n - The number of spaces to indent or the string to indent with.
+   * @returns {this} The Logger instance.
+   */
+  in(n: Integer | string = 2): this {
+    return this.indent(n);
+  }
+
+  /**
    * Adds indented text to the log message. 'res' stands for 'response', and
    * might be used to indent the response to an action.
    * @param {...any[]} args - The text arguments to add.
    * @returns {this} The Logger instance.
+   * @deprecated Use indent() instead.
    */
   res(...args): this {
     args.unshift(' ');
@@ -188,6 +195,7 @@ export class Logger {
    * Adds double-indented text to the log message.
    * @param {...any[]} args - The text arguments to add.
    * @returns {this} The Logger instance.
+   * @deprecated Use indent() instead.
    */
   res2(...args): this {
     args.unshift('   ');
@@ -207,116 +215,10 @@ export class Logger {
     return this;
   }
 
-  /**
-   * Adds styled action text to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  action(...args): this {
-    this._pre.push(this.style.format(args.join(' '), this.style.styles.action));
-    return this;
-  }
-
-  /**
-   * Adds a styled h1 header to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  h1(...args): this {
-    this._pre.push(this.format(args.join(' '), 'h1'));
-    return this;
-  }
-
-  /**
-   * Adds a styled h2 header to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  h2(...args): this {
-    this._pre.push(this.format(args.join(' '), 'h2'));
-    return this;
-  }
-
-  /**
-   * Adds a styled h3 header to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  h3(...args): this {
-    this._pre.push(this.format(args.join(' '), 'h3'));
-    return this;
-  }
-
-  /**
-   * Adds a styled label to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  label(...args): this {
-    this._pre.push(this.format(args.join(' '), 'label'));
-    return this;
-  }
-
-  /**
-   * Adds a styled value to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  value(...args): this {
-    this._pre.push(this.format(args.join(' '), 'value'));
-    return this;
-  }
-
-  /**
-   * Adds a styled path to the log message.
-   * @param {...any[]} args - The text arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  path(...args): this {
-    this._pre.push(this.format(args.join(' '), 'path'));
-    return this;
-  }
-
-  /**
-   * Adds a styled date to the log message.
-   * @param {any} arg - The date to add.
-   * @returns {this} The Logger instance.
-   */
-  date(arg): this {
-    this._pre.push(this.format(arg, 'date'));
-    return this;
-  }
-
-  /**
-   * Adds a styled alert to the log message.
-   * @param {any} arg - The alert message to add.
-   * @returns {this} The Logger instance.
-   */
-  alert(arg): this {
-    this._pre.push(this.format(arg, 'warn'));
-    return this;
-  }
-
-  /**
-   * Adds a styled warning to the log message.
-   * @param {...any[]} args - The warning message arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  warn(...args): this {
-    this._pre.push(this.format('WARNING:', 'warn'));
-    this._pre.push(this.format(args.join(' '), 'warn'));
-    return this;
-  }
-
-  /**
-   * Adds a styled error to the log message.
-   * @param {...any[]} args - The error message arguments to add.
-   * @returns {this} The Logger instance.
-   */
-  error(...args): this {
-    this._pre.push(this.format('ERROR:', 'error'));
-    this._pre.push(this.format(args.join(' '), 'error'));
-    return this;
+  addStyleMethods() {
+    for (const name in this._style.styles) {
+      (this as any)[name] = (...args: any[]) => this.stylize(name, ...args);
+    }
   }
 
   /**
@@ -367,9 +269,9 @@ export class Logger {
     return this.clear();
   }
 
-  protected format(val: any, styleName: StyleName): string {
-    return this._style.format(val, this._style.styles[styleName]);
-  }
+  // protected format(val: any, style: StyleName | StyleDef): string {
+  //   return this._style.format(val, style);
+  // }
 
   /**
    * Outputs the log message.
@@ -401,4 +303,128 @@ export class Logger {
   skip(val: any): boolean {
     return false;
   }
+
+  // /**
+  //  * Adds styled action text to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // action(...args): this {
+  //   this._pre.push(this.style.format(args.join(' '), this.style.styles.action));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled h1 header to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // h1(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'h1'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled h2 header to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // h2(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'h2'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled h3 header to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // h3(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'h3'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled label to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // label(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'label'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled value to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // value(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'value'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled path to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // path(...args): this {
+  //   this._pre.push(this.format(args.join(' '), 'path'));
+  //   return this;
+  // }
+
+  //   /**
+  //  * Adds unformatted text to the log message.
+  //  * @param {...any[]} args - The text arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  //   text(...args: any[]): this {
+  //     this._pre.push(args.join(' '));
+  //     return this;
+  //   }
+
+  // /**
+  //  * Adds a styled date to the log message.
+  //  * @param {any} arg - The date to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // date(arg): this {
+  //   this._pre.push(this.format(arg, 'date'));
+  //   return this;
+  // }
+
+  // /**
+  //  * Adds a styled alert to the log message.
+  //  * @param {any} arg - The alert message to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  // alert(arg): this {
+  //   this._pre.push(this.format(arg, 'warn'));
+  //   return this;
+  // }
+
+  //   /**
+  //  * Adds a styled warning to the log message.
+  //  * @param {...any[]} args - The warning message arguments to add.
+  //  * @returns {this} The Logger instance.
+  //  */
+  //   warn(...args): this {
+  //     this._pre.push(this.format('WARNING:', 'warn'));
+  //     this._pre.push(this.format(args.join(' '), 'warn'));
+  //     return this;
+  //   }
+
+  //   /**
+  //    * Adds a styled error to the log message.
+  //    * @param {...any[]} args - The error message arguments to add.
+  //    * @returns {this} The Logger instance.
+  //    */
+  //   error(...args): this {
+  //     this._pre.push(this.format('ERROR:', 'error'));
+  //     this._pre.push(this.format(args.join(' '), 'error'));
+  //     return this;
+  //   }
 }
+
+export type LoggerInstance = Logger & Record<StyleName, (...args: any[]) => Logger>;
