@@ -3,7 +3,7 @@ import { Integer, isInteger, isNonEmptyString } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { getLogLevelString, logLevel, LogLevelValue } from './levels';
 import { LoggerState } from './state';
-import { StyleDef, StyleName } from './style';
+import { MethodName, StyleDef, StyleName } from './style';
 
 const rightPadAndTruncate = (str: string, length: Integer, char = ' ') => {
   return str.length > length ? str.slice(0, length - 1) : str + char.repeat(length - str.length);
@@ -124,12 +124,12 @@ export class LoggerLine {
    * @param {StyleName | StyleDef} style - The style to use.
    * @returns {this} The Logger instance.
    */
-  stylize(style: StyleName | StyleDef, ...args): this {
+  stylize(style: StyleName | StyleDef, ...args): LoggerLineInstance {
     if (this._enabled && args.length) {
       const styleDef: StyleDef = isNonEmptyString(style) ? this._state.style.styles[style] : style;
       this._parts.push(this._state.style.format(args.join(' '), styleDef));
     }
-    return this;
+    return this as unknown as LoggerLineInstance;
   }
 
   protected addLevelPrefix() {
@@ -155,6 +155,42 @@ export class LoggerLine {
     return this;
   }
 
+  /**
+   * Emits the log line with elapsed time. This is a convenience method for
+   * emitting the log line with elapsed time without having to call `elapsed()`
+   * first.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see elapsed()
+   * @see emit()
+   */
+  emitWithTime(...args: any[]): void {
+    this._showElapsed = true;
+    return this.emit();
+  }
+
+  /**
+   * Emits the log line with elapsed time (Emit With Time = EWT). This is a
+   * convenience method for emitting the log line with elapsed time without
+   * having to call `elapsed()` first.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see elapsed()
+   * @see emit()
+   * @see emitWithTime()
+   */
+  ewt(...args: any[]): void {
+    this._showElapsed = true;
+    return this.emit();
+  }
+
+  /**
+   * Emits the log line.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see ewt()
+   * @see emitWithTime()
+   */
   emit(...args: any[]): void {
     if (this._enabled) {
       this.addLevelPrefix().addTimePrefix();
@@ -180,15 +216,20 @@ export class LoggerLine {
     const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
 
     for (const name in this._state.style.styles) {
-      if (methodNames.includes(name)) {
-        throw new Error(`Cannot declare style with reserved name ${name}`);
-      }
       if (!name.startsWith('_')) {
-        (this as any)[name] = (...args: any[]) => this.stylize(name, ...args);
+        if (methodNames.includes(name)) {
+          throw new Error(`Cannot declare style with reserved name ${name}`);
+        }
+        (this as any)[name] = (...args: any[]): LoggerLineInstance => {
+          this.stylize(name as StyleName, ...args);
+          return this as unknown as LoggerLineInstance;
+        };
       }
     }
     return this;
   }
 }
 
-export type LoggerLineInstance = LoggerLine & Record<StyleName, (...args: any[]) => LoggerLine>;
+export type LoggerLineInstance = LoggerLine & {
+  [key in MethodName]: (...args: any[]) => LoggerLineInstance; // Ensure dynamic methods return LoggerLineInstance
+};

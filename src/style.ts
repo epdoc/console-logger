@@ -7,8 +7,7 @@ export type StyleDef = {
   bg?: Color;
 };
 
-export const styles: Record<string, StyleDef> = {
-  // default: { fg: Color.white },
+export const styles = {
   text: { fg: Color.white },
   h1: { fg: Color.magenta },
   h2: { fg: Color.magenta },
@@ -25,8 +24,10 @@ export const styles: Record<string, StyleDef> = {
   _elapsed: { fg: Color.dark_gray },
   _levelPrefix: { fg: Color.dark_gray },
   _timePrefix: { fg: Color.dark_gray }
-};
+} as const;
+
 export type StyleName = keyof typeof styles;
+export type MethodName = Exclude<StyleName, `_${string}`>;
 
 export type StyleOptions = {
   styles?: Record<string, StyleDef>;
@@ -44,8 +45,8 @@ export class Style {
 
   addStyleMethods() {
     for (const name in this.styles) {
-      let sname = name.replace(/^_/, '');
-      (this as any)[sname] = (val: any) => this.format(val, name);
+      let methodName = name.replace(/^_/, '');
+      (this as any)[methodName] = (val: any) => this.format(val, name as StyleName);
     }
   }
 

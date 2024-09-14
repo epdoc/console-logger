@@ -2,7 +2,7 @@ import { appTimer } from './apptimer';
 import { logLevel, LogLevel, logLevelToValue, LogLevelValue } from './levels';
 import { LoggerLine, LoggerLineInstance } from './line';
 import { LoggerState, StateOptions } from './state';
-import { StyleOptions } from './style';
+import { StyleInstance, StyleOptions } from './style';
 
 export type LoggerOptions = StyleOptions & StateOptions & {};
 
@@ -47,6 +47,10 @@ export class Logger {
 
   get state(): LoggerState {
     return this._state;
+  }
+
+  get style(): StyleInstance {
+    return this._state.style as StyleInstance;
   }
 
   /**

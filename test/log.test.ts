@@ -4,6 +4,7 @@ describe('log', () => {
   describe('constructor', () => {
     it('getLevel default', () => {
       const log1: Logger = new Logger({ keepLines: true });
+      log1.debug().h2().text().emit();
       expect(log1.state.level).toBe(7);
       expect(log1.isEnabledFor(logLevel.trace)).toBe(false);
       expect(log1.isEnabledFor(logLevel.debug)).toBe(false);
@@ -27,7 +28,7 @@ describe('log', () => {
   });
   describe('text', () => {
     const log1: Logger = new Logger({ level: 1, keepLines: true });
-    log1.trace().tab().h2('hello').emit();
+    log1.trace().tab().text('hello').emit();
     expect(log1.lines).toEqual(['  hello']);
   });
   describe('text2', () => {
