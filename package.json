@@ -1,6 +1,6 @@
 {
   "name": "@epdoc/console-logger",
-  "version": "1.0.0+15",
+  "version": "1.0.0+18",
   "description": "A simple console logger for Node.js with terminal color support",
   "main": "dist/src/index.js",
   "author": "James Pravetz <jpravetz@gmail.com>",

@@ -1,8 +1,8 @@
 import { Integer } from '@epdoc/typeutil';
-import { appTimer } from './apptimer';
+import { AppTimer, appTimer } from './apptimer';
 import { logLevel, LogLevel, logLevelToValue, LogLevelValue } from './levels';
 import { LoggerLine, LoggerLineInstance } from './line';
-import { LoggerState, StateOptions } from './state';
+import { LoggerState, StateOptions, TimePrefix } from './state';
 import { StyleInstance, StyleOptions } from './style';
 
 export type LoggerOptions = StyleOptions & StateOptions & {};
@@ -52,6 +52,31 @@ export class Logger {
 
   get style(): StyleInstance {
     return this._state.style as StyleInstance;
+  }
+
+  setLevel(val: LogLevel | LogLevelValue): this {
+    this._state.setLevel(val);
+    return this;
+  }
+
+  setTimePrefix(val: TimePrefix): this {
+    this._state.setTimePrefix(val);
+    return this;
+  }
+
+  setLevelPrefix(val: boolean): this {
+    this._state.setLevelPrefix(val);
+    return this;
+  }
+
+  setTab(val: Integer): this {
+    this._state.setTab(val);
+    return this;
+  }
+
+  setTimer(val: AppTimer): this {
+    this._state.setAppTimer(val);
+    return this;
   }
 
   /**
