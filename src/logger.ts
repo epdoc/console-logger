@@ -1,3 +1,4 @@
+import { Integer } from '@epdoc/typeutil';
 import { appTimer } from './apptimer';
 import { logLevel, LogLevel, logLevelToValue, LogLevelValue } from './levels';
 import { LoggerLine, LoggerLineInstance } from './line';
@@ -125,7 +126,27 @@ export class Logger {
     if (this._state.level <= level) {
       this._line.enable();
     }
+    if (args.length) {
+      const count = countTabsAtBeginningOfString(args[0]);
+      if (count) {
+        this._line.tab(count);
+        args[0] = args[0].slice(count);
+      }
+    }
     this._line.text(...args);
     return this._line;
   }
+}
+
+/** LLM generated function to count and remove tabs at the beginning of a string */
+function countTabsAtBeginningOfString(str: string): Integer {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '\t') {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
 }
