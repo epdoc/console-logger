@@ -1,6 +1,6 @@
 {
   "name": "@epdoc/console-logger",
-  "version": "0.5.7",
+  "version": "1.0.0+1",
   "description": "A simple console logger for Node.js with terminal color support",
   "main": "dist/src/index.js",
   "author": "James Pravetz <jpravetz@gmail.com>",
@@ -10,7 +10,8 @@
   },
   "scripts": {
     "clean": "rimraf dist coverage",
-    "build": "rimraf dist && tsc",
+    "version": "node scripts/version-inc.js",
+    "build": "npm run clean & npm run version & tsc",
     "clear-warning": "watchman watch-del-all > /dev/null",
     "test": "npm run clear-warning; jest --runInBand",
     "format": "prettier --write 'src/**/*.ts'",
@@ -24,7 +25,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.13",
-    "@types/node": "^22.5.4",
+    "@types/node": "^22.5.5",
     "eslint": "^9.10.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prefer-arrow": "^1.2.3",

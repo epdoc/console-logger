@@ -14,17 +14,17 @@ export const styles: Record<string, StyleDef> = {
   h2: { fg: Color.magenta },
   h3: { fg: Color.green },
   action: { fg: Color.black, bg: Color.orange },
-  elapsed: { fg: Color.dark_gray },
   label: { fg: Color.teal },
   highlight: { fg: Color.purple },
   value: { fg: Color.blue },
   path: { fg: Color.dark_blue },
   date: { fg: Color.purple },
-  critical: { fg: Color.cyan },
-  fatal: { fg: Color.dark_red },
-  levelPrefix: { fg: Color.dark_gray },
-  timePrefix: { fg: Color.dark_gray },
-  strikethru: { fg: Color.inverse }
+  warn: { fg: Color.cyan },
+  error: { fg: Color.dark_red },
+  strikethru: { fg: Color.inverse },
+  _elapsed: { fg: Color.dark_gray },
+  _levelPrefix: { fg: Color.dark_gray },
+  _timePrefix: { fg: Color.dark_gray }
 };
 export type StyleName = keyof typeof styles;
 
@@ -33,7 +33,7 @@ export type StyleOptions = {
 };
 
 export class Style {
-  protected colorFormat: boolean = false;
+  protected _colorFormat: boolean = false;
   public readonly styles: Record<string, StyleDef>;
   [key: string]: ((val: any) => string) | any;
 
@@ -44,7 +44,8 @@ export class Style {
 
   addStyleMethods() {
     for (const name in this.styles) {
-      (this as any)[name] = (val: any) => this.format(val, name);
+      let sname = name.replace(/^_/, '');
+      (this as any)[sname] = (val: any) => this.format(val, name);
     }
   }
 
@@ -54,8 +55,17 @@ export class Style {
    */
   enable(val: boolean = true) {
     if (val === true) {
-      this.colorFormat = true;
+      this._colorFormat = true;
     }
+  }
+
+  /**
+   * Returns the current color format state. colorFormat indicates whether the
+   * format method will format the output with ANSI escape codes for color.
+   * @returns {boolean} - The current color format state.
+   */
+  get colorFormat(): boolean {
+    return this._colorFormat;
   }
 
   /**
@@ -77,7 +87,7 @@ export class Style {
     } else {
       s = String(val);
     }
-    if (this.colorFormat === false) {
+    if (this._colorFormat === false) {
       return s;
     } else {
       let pre = '';
@@ -88,7 +98,7 @@ export class Style {
       }
       if (isValidColor(styleDef.bg)) {
         pre += `\u001b[${styleDef.bg + 10}m`;
-        post = '\u001b[0m';
+        post += '\u001b[0m';
       }
       return `${pre}${s}${post}`;
     }
