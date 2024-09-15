@@ -2,6 +2,8 @@ import { Integer, isBoolean, isInteger } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { isLogLevelValue, LogLevel, logLevel, logLevelToValue, LogLevelValue } from './levels';
 import { Style } from './style';
+import { LoggerTransport } from './transports/transport';
+import { BufferTransport } from './transports/buffer';
 
 export type TimePrefix = 'local' | 'utc' | 'elapsed' | false;
 
@@ -25,20 +27,24 @@ export type StateOptions = {
   enableStyles?: boolean;
   style?: Style;
   level?: LogLevel | LogLevelValue;
-  tab?: Integer;
+  tabSize?: Integer;
   levelPrefix?: boolean;
   timePrefix?: TimePrefix;
   timer?: AppTimer;
   keepLines?: boolean;
+  transport?: LoggerTransport;
+  colorize?: boolean;
 };
 
 export class LoggerState {
   protected _style: Style = new Style();
   protected _loggerLevel: LogLevelValue = logLevel.info;
-  protected _tab: Integer = 2;
+  protected _tabSize: Integer = 2;
   protected _levelPrefix = false;
   protected _timePrefix: TimePrefix = false;
   protected _appTimer: AppTimer = new AppTimer();
+  protected _colorize: boolean = false;
+  protected _transport: LoggerTransport;
   protected _keepLines: boolean = false;
   protected _lines: string[] = [];
 
@@ -46,22 +52,25 @@ export class LoggerState {
     this.setLevel(options.level)
       .setStyle(options.style)
       .setLevelPrefix(options.levelPrefix)
-      .setTab(options.tab)
+      .setTab(options.tabSize)
       .setTimePrefix(options.timePrefix)
       .setAppTimer(options.timer)
-      .setKeepLines(options.keepLines);
+      .setTransport(options.transport);
     if (options.enableStyles === true) {
       this._style.enable(true);
     }
+    if (options.colorize === true) {
+      this._colorize = true;
+    }
+    if (options.keepLines === true) {
+      this._transport = new BufferTransport();
+    } else {
+      this._transport = new ConsoleTransport();
+    }
   }
 
-  get lines(): string[] {
-    return this._lines;
-  }
-
-  clearLines(): this {
-    this._lines = [];
-    return this;
+  get colorize(): boolean {
+    return this._colorize;
   }
 
   /**
@@ -96,6 +105,17 @@ export class LoggerState {
     return this;
   }
 
+  setTransport(transport: LoggerTransport): this {
+    if (transport instanceof LoggerTransport) {
+      this._transport = transport;
+    }
+    return this;
+  }
+
+  get transport(): LoggerTransport {
+    return this._transport;
+  }
+
   /**
    * Gets the current log level.
    * @returns {LogLevel} The current log level.
@@ -126,12 +146,12 @@ export class LoggerState {
    * @returns {this} The Logger instance.
    */
   setTab(val: Integer): this {
-    this._tab = isInteger(val) ? val : this._tab;
+    this._tabSize = isInteger(val) ? val : this._tabSize;
     return this;
   }
 
-  get tab(): Integer {
-    return this._tab;
+  get tabSize(): Integer {
+    return this._tabSize;
   }
 
   /**

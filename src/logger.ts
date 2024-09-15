@@ -26,7 +26,7 @@ export class Logger {
   constructor(
     options: LoggerOptions = {
       level: logLevel.info,
-      tab: 2,
+      tabSize: 2,
       levelPrefix: false,
       timePrefix: 'local',
       timer: appTimer,
@@ -42,9 +42,9 @@ export class Logger {
    * Gets the lines stored in memory. Only applicable if keepLines is true.
    * @returns {string[]} The lines stored in memory.
    */
-  get lines(): string[] {
-    return this._state.lines;
-  }
+  // get lines(): string[] {
+  //   return this._state.lines;
+  // }
 
   get state(): LoggerState {
     return this._state;
@@ -101,10 +101,10 @@ export class Logger {
     return this._state.level <= logLevelToValue(val);
   }
 
-  clearLines(): this {
-    this._state.clearLines();
-    return this;
-  }
+  // clearLines(): this {
+  //   this._state.clearLines();
+  //   return this;
+  // }
 
   /**
    * Clears the current line, essentially resetting the output line.
@@ -145,7 +145,8 @@ export class Logger {
 
   private initLine(level: LogLevelValue, ...args: any[]): LoggerLineInstance {
     if (!this._line.isEmpty()) {
-      throw new Error('Emit the previous log message before logging a new one');
+      const unemitted = this._line.partsAsString();
+      throw new Error(`Emit the previous log message before logging a new one: ${unemitted}`);
     }
     this._line.clear().level(level);
     if (this._state.level <= level) {

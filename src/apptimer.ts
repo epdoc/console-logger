@@ -37,6 +37,20 @@ export class AppTimer {
     return performance.now();
   }
 
+  get startTime(): Microseconds {
+    return this._startTime;
+  }
+
+  set startTime(value: Microseconds | Date | undefined) {
+    if (typeof value === 'number') {
+      this._startTime = value;
+    } else if (value instanceof Date) {
+      this._startTime = value.getTime();
+    } else if (value === undefined) {
+      this._startTime = this.now();
+    }
+  }
+
   /**
    * Resets both the start time and last measurement to the current time.
    * @returns {this} The current instance for method chaining.

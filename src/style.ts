@@ -7,6 +7,16 @@ export type StyleDef = {
   bg?: Color;
 };
 
+/**
+ * The default styles for the logger. Styles are defined as a key-value pair
+ * where the key is the name of the style and the value is the style definition.
+ * The style definition is an object with optional fg and bg properties. The fg
+ * property is the foreground color. The bg property is the background color.
+ *
+ * The constructors for both the Style and LoggerLine classes add methods for
+ * each of these styles. Styles that begin with an underscore are only added as
+ * style methods to the Style class.
+ */
 export const styles = {
   text: { fg: Color.white },
   h1: { fg: Color.magenta },
@@ -21,6 +31,11 @@ export const styles = {
   warn: { fg: Color.cyan },
   error: { fg: Color.dark_red },
   strikethru: { fg: Color.inverse },
+  _reqId: { fg: Color.orange },
+  _sid: { fg: Color.yellow },
+  _emitter: { fg: Color.green },
+  _action: { fg: Color.blue },
+  _suffix: { fg: Color.dark_gray },
   _elapsed: { fg: Color.dark_gray },
   _levelPrefix: { fg: Color.dark_gray },
   _timePrefix: { fg: Color.dark_gray }

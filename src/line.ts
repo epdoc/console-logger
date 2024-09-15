@@ -1,5 +1,5 @@
 import { dateUtil } from '@epdoc/timeutil';
-import { Integer, isInteger, isNonEmptyString } from '@epdoc/typeutil';
+import { Integer, isInteger, isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { getLogLevelString, logLevel, LogLevelValue } from './levels';
 import { LoggerState } from './state';
@@ -9,19 +9,37 @@ const rightPadAndTruncate = (str: string, length: Integer, char = ' ') => {
   return str.length > length ? str.slice(0, length - 1) : str + char.repeat(length - str.length);
 };
 
+/**
+ * A LoggerLine is a line of output from a Logger. It is used to build up a log
+ * line, add styling, and emit the log line.
+ */
 export class LoggerLine {
   protected _state: LoggerState;
+  protected _tab: string = '';
   protected _parts: string[] = [];
+  protected _suffix: string[] = [];
   protected _timer: AppTimer;
   protected _level: LogLevelValue = logLevel.info;
   protected _showElapsed: boolean = false;
+  protected _reqId: string;
+  protected _sid: string;
+  protected _emitter: string;
+  protected _action: string;
   protected _enabled = false;
 
+  /**
+   * Creates a new LoggerLine.
+   * @param {LoggerState} state - The state of the Logger.
+   */
   constructor(state: LoggerState) {
     this._state = state;
     this.addStyleMethods();
   }
 
+  /**
+   * Returns true if the line is empty.
+   * @returns {boolean} - True if the line is empty, false otherwise.
+   */
   isEmpty(): boolean {
     return this._parts.length === 0;
   }
@@ -29,7 +47,8 @@ export class LoggerLine {
   /**
    * Enables logging for this line of output. This will be set true by
    * `Logger.initLine()` if the log level for this line is higher than the log
-   * level set for the Logger.
+   * level set for the Logger. By inspecting this value, we can determine if
+   * formatting and other code can be skipped.
    * @returns {this} The LoggerLine instance.
    */
   enable(): this {
@@ -38,26 +57,59 @@ export class LoggerLine {
   }
 
   /**
-   * Exposed for unit testing only.
-   * @returns {Record<string, any>} The current state of the LoggerLine.
+   * For logging in an Express or Koa environment, sets the request ID for this
+   * line of output. Use is entirely optional.
+   * @param {string} id - The request ID.
+   * @returns {this} The LoggerLine instance.
    */
-  unitState(): Record<string, any> {
-    return {
-      state: this._state,
-      enabled: this._enabled,
-      elapsed: this._showElapsed,
-      level: this._level
-    };
+  reqId(id: string): this {
+    this._reqId = id;
+    return this;
   }
 
   /**
-   * Clears the current line, essentially resetting the output line.
+   * Add the session ID for this line of output. Use is entirely optional.
+   * @param {string} id - The session ID.
+   * @returns {this} The LoggerLine instance.
+   */
+  sid(id: string): this {
+    this._sid = id;
+    return this;
+  }
+
+  /**
+   * Add the emitter for this line of output. The emitter can be a class name,
+   * module name, or other identifier. Use is entirely optional.
+   * @param {string} name - The emitter name.
+   * @returns {this} The LoggerLine instance.
+   */
+  emitter(name: string): this {
+    this._emitter = name;
+    return this;
+  }
+
+  /**
+   * Add the action for this line of output. The action is usually a verb for
+   * what this line is doing. Use is entirely optional.
+   * @param {string} name - The action name.
+   * @returns {this} The LoggerLine instance.
+   */
+  action(name: string): this {
+    this._action = name;
+    return this;
+  }
+
+  /**
+   * Clears the current line, essentially resetting the output line. This does
+   * not clear the reqId, sid or emitter values.
    * @returns {this} The LoggerLine instance.
    */
   clear(): this {
     this._enabled = false;
     this._showElapsed = false;
+    this._action = undefined;
     this._parts = [];
+    this._suffix = [];
     return this;
   }
 
@@ -85,22 +137,22 @@ export class LoggerLine {
   indent(n: Integer | string = 2): this {
     if (this._enabled) {
       if (isInteger(n)) {
-        this._parts.push(' '.repeat(n - 1));
+        this._tab = ' '.repeat(n - 1);
       } else if (isNonEmptyString(n)) {
-        this._parts.push(n);
+        this._tab = n;
       }
     }
     return this;
   }
 
   /**
-   * Adds indented text to the log message.
+   * Sets the indentation level of this line of log output..
    * @param {Integer} n - The number of tabs by which to indent.
    * @returns {this} The Logger instance.
    */
   tab(n: Integer = 1): this {
     if (this._enabled) {
-      this._parts.push(' '.repeat(n * this._state.tab - 1));
+      this._tab = ' '.repeat(n * this._state.tabSize - 1);
     }
     return this;
   }
@@ -119,6 +171,16 @@ export class LoggerLine {
   }
 
   /**
+   * Adds a comment to the end of the log line.
+   * @param {any} args - The arguments to add.
+   * @returns {this} The Logger instance.
+   */
+  comment(...args: string[]): this {
+    this._suffix.push(...args);
+    return this;
+  }
+
+  /**
    * Adds styled text to the log line.
    * @param {any} val - The value to stylize.
    * @param {StyleName | StyleDef} style - The style to use.
@@ -126,10 +188,90 @@ export class LoggerLine {
    */
   stylize(style: StyleName | StyleDef, ...args): LoggerLineInstance {
     if (this._enabled && args.length) {
-      const styleDef: StyleDef = isNonEmptyString(style) ? this._state.style.styles[style] : style;
-      this._parts.push(this._state.style.format(args.join(' '), styleDef));
+      if (this._state.colorize && this._state.transport.supportsColor) {
+        const styleDef: StyleDef = isNonEmptyString(style)
+          ? this._state.style.styles[style]
+          : style;
+        this._parts.push(this._state.style.format(args.join(' '), styleDef));
+      } else {
+        this._parts.push(...args);
+      }
     }
     return this as unknown as LoggerLineInstance;
+  }
+
+  /**
+   * Adds plain text to the log line.
+   * @param {any} args - The arguments to add.
+   * @returns {this} The Logger instance.
+   */
+  plain(...args: any[]): this {
+    if (this._enabled && isNonEmptyArray(args)) {
+      this._parts.push(...args);
+    }
+    return this;
+  }
+
+  /**
+   * Emits the log line with elapsed time. This is a convenience method for
+   * emitting the log line with elapsed time without having to call `elapsed()`
+   * first.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see elapsed()
+   * @see emit()
+   */
+  emitWithTime(...args: any[]): void {
+    this._showElapsed = true;
+    return this.emit(...args);
+  }
+
+  /**
+   * Emits the log line with elapsed time (Emit With Time = EWT). This is a
+   * convenience method for emitting the log line with elapsed time without
+   * having to call `elapsed()` first.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see elapsed()
+   * @see emit()
+   * @see emitWithTime()
+   */
+  ewt(...args: any[]): void {
+    this._showElapsed = true;
+    return this.emit(...args);
+  }
+
+  /**
+   * Emits the log line.
+   * @param {any[]} args - The arguments to emit.
+   * @returns {void}
+   * @see ewt()
+   * @see emitWithTime()
+   */
+  emit(...args: any[]): void {
+    if (this._enabled) {
+      this.addPlain(...args);
+      this.addLevelPrefix()
+        .addTimePrefix()
+        .addPlain(...args)
+        .addSuffix()
+        .addElapsed();
+      const line = this._parts.join(' ');
+      this._state.transport.write(this);
+      this.clear();
+    }
+  }
+
+  formatAsString(): string {
+    this.addLevelPrefix()
+      .addTimePrefix()
+      .addReqId()
+      .addSid()
+      .addEmitter()
+      .addAction()
+      .addSuffix()
+      .addElapsed();
+    return this._parts.join(' ');
   }
 
   protected addLevelPrefix() {
@@ -156,57 +298,84 @@ export class LoggerLine {
   }
 
   /**
-   * Emits the log line with elapsed time. This is a convenience method for
-   * emitting the log line with elapsed time without having to call `elapsed()`
-   * first.
-   * @param {any[]} args - The arguments to emit.
-   * @returns {void}
-   * @see elapsed()
-   * @see emit()
+   * For logging in an Express or Koa environment, adds the request ID to the
+   * log line. This is for internal use by the emit method.
+   * @returns {this} The LoggerLine instance.
    */
-  emitWithTime(...args: any[]): void {
-    this._showElapsed = true;
-    return this.emit();
-  }
-
-  /**
-   * Emits the log line with elapsed time (Emit With Time = EWT). This is a
-   * convenience method for emitting the log line with elapsed time without
-   * having to call `elapsed()` first.
-   * @param {any[]} args - The arguments to emit.
-   * @returns {void}
-   * @see elapsed()
-   * @see emit()
-   * @see emitWithTime()
-   */
-  ewt(...args: any[]): void {
-    this._showElapsed = true;
-    return this.emit();
-  }
-
-  /**
-   * Emits the log line.
-   * @param {any[]} args - The arguments to emit.
-   * @returns {void}
-   * @see ewt()
-   * @see emitWithTime()
-   */
-  emit(...args: any[]): void {
-    if (this._enabled) {
-      this.addLevelPrefix().addTimePrefix();
-      this._parts.push(...args);
-      if (this._showElapsed) {
-        const et = this._state.timer.measureFormatted();
-        this.stylize('_elapsed', `${et.total} (${et.interval})`);
-      }
-      const line = this._parts.join(' ');
-      if (this._state.keepLines) {
-        this._state.lines.push(line);
-      } else {
-        console.log(line);
-      }
-      this.clear();
+  protected addReqId(): this {
+    if (this._reqId) {
+      this._parts.unshift(this._state.style.reqId(this._reqId));
     }
+    return this;
+  }
+
+  /**
+   * Adds the session ID to the log line.
+   * @returns {this} The LoggerLine instance.
+   */
+  protected addSid(): this {
+    if (this._sid) {
+      this._parts.unshift(this._state.style.sid(this._sid));
+    }
+    return this;
+  }
+
+  protected addEmitter(): this {
+    if (this._emitter) {
+      this._parts.unshift(this._state.style.emitter(this._emitter));
+    }
+    return this;
+  }
+
+  protected addAction(): this {
+    if (this._action) {
+      this._parts.unshift(this._state.style.action(this._action));
+    }
+    return this;
+  }
+
+  protected addPlain(...args: any[]): this {
+    this._parts.push(...args);
+    return this;
+  }
+
+  protected addSuffix(): this {
+    if (this._suffix.length) {
+      this.stylize('_suffix', ...this._suffix);
+    }
+    return this;
+  }
+
+  protected addElapsed(): this {
+    if (this._showElapsed) {
+      const et = this._state.timer.measureFormatted();
+      this.stylize('_elapsed', `${et.total} (${et.interval})`);
+    }
+    return this;
+  }
+
+  /**
+   * Returns the parts of the line as an unformatted string. This should only be
+   * used in situations where the line is not going to be emitted to the console
+   * or a log file, but is instead going to be emitted elsewhere, such as in a
+   * unit test or error message.
+   * @returns {string} - The parts of the line as a string.
+   */
+  partsAsString(): string {
+    return [...this._parts, ...this._suffix].join(' ');
+  }
+
+  /**
+   * Exposed for unit testing only.
+   * @returns {Record<string, any>} The current state of the LoggerLine.
+   */
+  unitState(): Record<string, any> {
+    return {
+      state: this._state,
+      enabled: this._enabled,
+      elapsed: this._showElapsed,
+      level: this._level
+    };
   }
 
   /**
