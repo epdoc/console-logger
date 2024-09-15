@@ -194,12 +194,13 @@ export class LoggerLine {
   emit(...args: any[]): void {
     if (this._enabled) {
       this.addLevelPrefix().addTimePrefix();
-      let line = [...this._parts, ...args].join(' ');
+      this._parts.push(...args);
       if (this._showElapsed) {
         const et = this._state.timer.measureFormatted();
-        line += ' ' + this.stylize('_elapsed', `${et.total} (${et.interval})`);
+        this.stylize('_elapsed', `${et.total} (${et.interval})`);
       }
-      if (this._state.setKeepLines) {
+      const line = this._parts.join(' ');
+      if (this._state.keepLines) {
         this._state.lines.push(line);
       } else {
         console.log(line);
