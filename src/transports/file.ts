@@ -2,13 +2,18 @@ import fs from 'node:fs';
 import path from 'path';
 import { promisify } from 'util';
 import { LoggerLine } from '../line';
-import { LoggerTransport, TransportOptions } from './transport';
+import { LoggerTransport, TransportOptions } from './base';
+import { TransportType } from './factory';
 
 const mkdir = promisify(fs.mkdir);
 
 export type FileTransportOptions = TransportOptions & {
   filename: string;
 };
+
+export function getNewFileTransport(options: FileTransportOptions): FileTransport {
+  return new FileTransport(options);
+}
 
 export class FileTransport extends LoggerTransport {
   protected _filePath: string;
@@ -20,6 +25,10 @@ export class FileTransport extends LoggerTransport {
   constructor(options: FileTransportOptions) {
     super(options);
     this._filePath = options.filename;
+  }
+
+  get name(): TransportType {
+    return 'console';
   }
 
   /**

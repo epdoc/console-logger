@@ -28,8 +28,8 @@ export class AppTimer {
   protected _startTime: Microseconds;
   protected _lastMeasurement: Microseconds;
 
-  constructor() {
-    this._startTime = this.now();
+  constructor(startTime: Microseconds = performance.now()) {
+    this._startTime = startTime;
     this._lastMeasurement = this._startTime;
   }
 

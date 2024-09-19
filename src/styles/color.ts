@@ -1,6 +1,6 @@
-import { dateUtil } from '@epdoc/timeutil';
-import { isArray, isDate, isDict } from '@epdoc/typeutil';
-import { Color, isValidColor } from './util';
+import { getLogLevelString, LogLevelValue } from '../levels';
+import { Color, isValidColor } from '../util';
+import { BaseStyle, StyleOptions } from './base';
 
 export type StyleDef = {
   fg?: Color;
@@ -35,77 +35,69 @@ export const styles = {
   _sid: { fg: Color.yellow },
   _emitter: { fg: Color.green },
   _action: { fg: Color.blue },
+  _plain: { fg: Color.white },
   _suffix: { fg: Color.dark_gray },
   _elapsed: { fg: Color.dark_gray },
+  _errorPrefix: { fg: Color.dark_red },
+  _warnPrefix: { fg: Color.cyan },
   _levelPrefix: { fg: Color.dark_gray },
   _timePrefix: { fg: Color.dark_gray }
 } as const;
 
-export type StyleName = keyof typeof styles;
-export type MethodName = Exclude<StyleName, `_${string}`>;
+export type ColorStyleName = keyof typeof styles;
 
-export type StyleOptions = {
+export type ColorStyleOpts = StyleOptions & {
   styles?: Record<string, StyleDef>;
 };
 
-export class Style {
-  protected _colorFormat: boolean = false;
+export class ColorStyle extends BaseStyle {
   public readonly styles: Record<string, StyleDef>;
   [key: string]: ((val: any) => string) | any;
 
-  constructor(options: StyleOptions = {}) {
+  constructor(options: ColorStyleOpts = {}) {
+    super(options);
     this.styles = Object.assign({}, options.styles ? options.styles : styles);
     this.addStyleMethods();
   }
 
-  addStyleMethods() {
-    for (const name in this.styles) {
-      let methodName = name.replace(/^_/, '');
-      (this as any)[methodName] = (val: any) => this.format(val, name as StyleName);
-    }
+  get styles(): ColorStyleName[] {
+    return Object.keys(styles);
   }
 
-  /**
-   * Enables or disables color formatting.
-   * @param {boolean} [val=true] - If true, color formatting is enabled.
-   */
-  enable(val: boolean = true) {
-    if (val === true) {
-      this._colorFormat = true;
-    }
+  getStyleDef(name: ColorStyleName): StyleDef {
+    return this.styles[name];
   }
 
-  /**
-   * Returns the current color format state. colorFormat indicates whether the
-   * format method will format the output with ANSI escape codes for color.
-   * @returns {boolean} - The current color format state.
-   */
-  get colorFormat(): boolean {
-    return this._colorFormat;
+  getLevelStyleName(level: LogLevelValue): ColorStyleName {
+    const styleName = `${getLogLevelString(level)}Prefix` as ColorStyleName;
+    if (styles['_' + styleName]) {
+      return styleName;
+    }
+    return '_levelPrefix';
   }
+
+  // addStyleMethods() {
+  //   for (const name in this.styles) {
+  //     let methodName = name.replace(/^_/, '');
+  //     (this as any)[methodName] = (val: any) => this.format(val, name as ColorStyleName);
+  //   }
+  // }
 
   /**
    * Adds a style to the style map or replace an existing style
    * @param {string} name - The name of the style.
    * @param {StyleDef} styleDef - The style definition.
    */
-  addStyle(name: string, styleDef: StyleDef) {
-    this.styles[name] = styleDef;
-  }
+  // addStyle(name: string, styleDef: StyleDef) {
+  //   this.styles[name] = styleDef;
+  // }
 
-  format(val: any, style: StyleName | StyleDef): string {
+  format(val: any, style: ColorStyleName | StyleDef): string {
+    const s = super.format(val);
     let styleDef = typeof style === 'string' ? this.styles[style] : style;
-    let s = '';
-    if (isDict(val) || isArray(val)) {
-      s = JSON.stringify(val);
-    } else if (isDate(val)) {
-      s = dateUtil(val).format('YYYY-MM-dd HH:mm:ss');
-    } else {
-      s = String(val);
-    }
-    if (this._colorFormat === false) {
+    if (!styleDef) {
       return s;
-    } else {
+    } else if (styleDef) {
       let pre = '';
       let post = '';
       if (isValidColor(styleDef.fg)) {
@@ -121,5 +113,5 @@ export class Style {
   }
 }
 
-// Add this type declaration
-export type StyleInstance = Style & Record<StyleName, (val: any) => string>;
+// // Add this type declaration
+// export type StyleInstance = ColorStyle & Record<ColorStyleName, (val: any) => string>;

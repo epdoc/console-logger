@@ -1,21 +1,16 @@
 import { Integer, isBoolean, isInteger } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { isLogLevelValue, LogLevel, logLevel, logLevelToValue, LogLevelValue } from './levels';
-import { Style } from './style';
-import { LoggerTransport } from './transports/transport';
+import { ColorStyle } from './styles/color';
+import { LoggerTransport } from './transports/base';
 import { BufferTransport } from './transports/buffer';
-
-export type TimePrefix = 'local' | 'utc' | 'elapsed' | false;
-
-export function isValidTimePrefix(val: any): val is TimePrefix {
-  return ['local', 'utc', 'elapsed', false].includes(val);
-}
+import { TimePrefix } from './types';
 
 /**
  * Configuration options for the Logger.
  * @typedef {Object} LoggerOptions
  * @property {boolean} [enableStyles] - Whether to enable styling of console messages or to leave as plain text. Defaults to false.
- * @property {Style} [style] - Custom Style instance to use for formatting. Defaults to the default style.
+ * @property {ColorStyle} [style] - Custom Style instance to use for formatting. Defaults to the default style.
  * @property {LogLevel | LogLevelValue} [level] - The minimum log level to output.
  * @property {Integer} [tab] - The number of spaces to use for indentation. Defaults to 2.
  * @property {boolean} [levelPrefix] - Whether to prefix log messages with their level. Defaults to false.
@@ -25,7 +20,7 @@ export function isValidTimePrefix(val: any): val is TimePrefix {
  */
 export type StateOptions = {
   enableStyles?: boolean;
-  style?: Style;
+  style?: ColorStyle;
   level?: LogLevel | LogLevelValue;
   tabSize?: Integer;
   levelPrefix?: boolean;
@@ -37,7 +32,7 @@ export type StateOptions = {
 };
 
 export class LoggerState {
-  protected _style: Style = new Style();
+  protected _style: ColorStyle = new ColorStyle();
   protected _loggerLevel: LogLevelValue = logLevel.info;
   protected _tabSize: Integer = 2;
   protected _levelPrefix = false;
@@ -75,10 +70,10 @@ export class LoggerState {
 
   /**
    * Sets an alternate style for the logger.
-   * @param {Style} style - The style to set.
+   * @param {ColorStyle} style - The style to set.
    */
-  setStyle(style: Style): this {
-    if (style instanceof Style) {
+  setStyle(style: ColorStyle): this {
+    if (style instanceof ColorStyle) {
       this._style = style;
     }
     return this;
@@ -86,9 +81,9 @@ export class LoggerState {
 
   /**
    * Gets the current style.
-   * @returns {Style} The current style.
+   * @returns {ColorStyle} The current style.
    */
-  get style(): Style {
+  get style(): ColorStyle {
     return this._style;
   }
 

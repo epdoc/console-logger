@@ -1,11 +1,13 @@
 import { Integer } from '@epdoc/typeutil';
-import { AppTimer, appTimer } from './apptimer';
+import { AppTimer } from './apptimer';
 import { logLevel, LogLevel, logLevelToValue, LogLevelValue } from './levels';
-import { LoggerLine, LoggerLineInstance } from './line';
-import { LoggerState, StateOptions, TimePrefix } from './state';
-import { StyleInstance, StyleOptions } from './style';
+import { LoggerLine, LoggerLineInstance, LoggerLineOpts } from './line';
+// import { LoggerState, StateOptions, TimePrefix } from './state';
+import { StyleInstance } from './styles/color';
+import { LoggerTransport } from './transports';
+import { LoggerOptions, LoggerShowOpts, LogMessage, TimePrefix } from './types';
 
-export type LoggerOptions = StyleOptions & StateOptions & {};
+let reqId = 0;
 
 /**
  * Logger class
@@ -16,26 +18,32 @@ export type LoggerOptions = StyleOptions & StateOptions & {};
  * ```
  */
 export class Logger {
-  protected _state: LoggerState;
+  protected _showOpts: LoggerShowOpts = {};
+  protected _transports: LoggerTransport[] = [];
+  protected _style: StyleInstance;
+  protected _msgParams: LogMessage = {};
+  // protected _state: LoggerState;
+  protected _time: TimePrefix = 'local';
+  protected _level: LogLevelValue = logLevel.info;
+  protected _reqId?: string = String(reqId++);
+  protected _action?: string;
+  protected _emitter?: string;
+  protected _data?: any;
   protected _line: LoggerLineInstance;
 
   /**
    * Constructor for the Logger class.
    * @param {LoggerOptions} options - The options for the logger.
    */
-  constructor(
-    options: LoggerOptions = {
-      level: logLevel.info,
-      tabSize: 2,
-      levelPrefix: false,
-      timePrefix: 'local',
-      timer: appTimer,
-      keepLines: false,
-      enableStyles: false
-    }
-  ) {
-    this._state = new LoggerState(options);
-    this._line = new LoggerLine(this._state) as LoggerLineInstance;
+  constructor(options: LoggerOptions = {}) {
+    this._transports = options.transports ??= [];
+    this._showOpts = options.show ??= {};
+    this._style = options.style ??= new Style();
+    const lineOpts: LoggerLineOpts = {
+      format: formatOpts
+    };
+
+    this._line = new LoggerLine(this._showOpts) as LoggerLineInstance;
   }
 
   /**

@@ -1,13 +1,14 @@
 import { asInt, isString } from '@epdoc/typeutil';
 
 export const logLevel = {
-  skip: 0,
-  trace: 1,
-  debug: 3,
-  verbose: 5,
-  info: 7,
-  warn: 8,
-  error: 9
+  error: 0,
+  warn: 1,
+  info: 2,
+  http: 3,
+  verbose: 4,
+  debug: 5,
+  silly: 6,
+  skip: 9
 } as const;
 
 export type LogLevel = keyof typeof logLevel;
@@ -29,7 +30,11 @@ export function logLevelToValue(level: LogLevel | LogLevelValue): LogLevelValue 
  * @returns {boolean} True if the value is a valid LogLevel, false otherwise.
  */
 export function isLogLevelValue(val: any): val is LogLevelValue {
-  return [1, 3, 5, 7, 8, 9].includes(val);
+  return [0, 1, 2, 3, 4, 5, 6, 9].includes(val);
+}
+
+export function meetsLogThreshold(level: LogLevelValue, threshold: LogLevelValue): boolean {
+  return level <= threshold;
 }
 
 /**

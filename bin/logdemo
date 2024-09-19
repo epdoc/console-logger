@@ -1,0 +1,9 @@
+#!/bin/bash
+# echo Path: $PWD
+cwd=$PWD
+parent_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
+# echo factura: $parent_path
+cd "$parent_path"
+config_path=$parent_path/../config/project.settings.json
+# npx tsc && node ../dist/src/cli.js --path $cwd "$@"
+node --no-deprecation ../dist/src/demo.js --config $config_path --color "$@"

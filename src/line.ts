@@ -2,11 +2,22 @@ import { dateUtil } from '@epdoc/timeutil';
 import { Integer, isInteger, isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { getLogLevelString, logLevel, LogLevelValue } from './levels';
-import { LoggerState } from './state';
-import { MethodName, StyleDef, StyleName } from './style';
+import { Logger } from './logger';
+import { getLevelStyleName, MethodName, StyleDef, StyleName } from './styles/color';
+import { TransportType } from './transports';
+import { LineTransportOpts, LoggerLineFormatOpts, LoggerLineOpts, LoggerShowOpts } from './types';
+
+const DEFAULT_TAB_SIZE = 2;
 
 const rightPadAndTruncate = (str: string, length: Integer, char = ' ') => {
   return str.length > length ? str.slice(0, length - 1) : str + char.repeat(length - str.length);
+};
+
+export type LoggerLineTransportFormatOpts = Record<TransportType, LoggerLineFormatOpts>;
+
+type MsgPart = {
+  str: string;
+  style: StyleName;
 };
 
 /**
@@ -14,12 +25,17 @@ const rightPadAndTruncate = (str: string, length: Integer, char = ' ') => {
  * line, add styling, and emit the log line.
  */
 export class LoggerLine {
-  protected _state: LoggerState;
-  protected _tab: string = '';
-  protected _parts: string[] = [];
+  protected _logger: Logger;
+  protected _showOpts: LoggerShowOpts;
+  protected _lineFormat: LoggerLineFormatOpts;
+  // protected _style: StyleInstance;
+  protected _transports: LineTransportOpts[];
+  protected _msgIndent: string = '';
+  protected _msgParts: MsgPart[] = [];
   protected _suffix: string[] = [];
   protected _timer: AppTimer;
   protected _level: LogLevelValue = logLevel.info;
+  protected _levelThreshold: LogLevelValue;
   protected _showElapsed: boolean = false;
   protected _reqId: string;
   protected _sid: string;
@@ -27,28 +43,37 @@ export class LoggerLine {
   protected _action: string;
   protected _enabled = false;
 
-  /**
-   * Creates a new LoggerLine.
-   * @param {LoggerState} state - The state of the Logger.
-   */
-  constructor(state: LoggerState) {
-    this._state = state;
+  constructor(options: LoggerLineOpts, levelThreshold: LogLevelValue = logLevel.info) {
+    this._showOpts = options.show;
+    this._lineFormat = options.lineFormat;
+    // this._style = options.lineFormat.style ??= new Style() as StyleInstance;
+    this._transports = options.transports;
+    this._levelThreshold = levelThreshold;
     this.addStyleMethods();
   }
 
   /**
-   * Returns true if the line is empty.
+   * Returns true if the line is empty of a composed string message
    * @returns {boolean} - True if the line is empty, false otherwise.
    */
   isEmpty(): boolean {
-    return this._parts.length === 0;
+    return this._msgParts.length === 0;
   }
+
+  get stylizeEnabled(): boolean {
+    return this._lineFormat.stylize ?? false;
+  }
+
+  // get style(): StyleInstance {
+  //   return this._style;
+  // }
 
   /**
    * Enables logging for this line of output. This will be set true by
    * `Logger.initLine()` if the log level for this line is higher than the log
    * level set for the Logger. By inspecting this value, we can determine if
-   * formatting and other code can be skipped.
+   * formatting and other code can be skipped, thus improving performance by a
+   * picosecond.
    * @returns {this} The LoggerLine instance.
    */
   enable(): this {
@@ -108,7 +133,7 @@ export class LoggerLine {
     this._enabled = false;
     this._showElapsed = false;
     this._action = undefined;
-    this._parts = [];
+    this._msgParts = [];
     this._suffix = [];
     return this;
   }
@@ -129,17 +154,21 @@ export class LoggerLine {
     return this;
   }
 
+  get tabSize(): Integer {
+    return (this._lineFormat.tabSize ??= DEFAULT_TAB_SIZE);
+  }
+
   /**
    * Indents the log message by this many characters or the string to indent with.
    * @param {Integer | string} n - The number of spaces to indent or the string to indent with.
    * @returns {this} The Logger instance.
    */
-  indent(n: Integer | string = 2): this {
+  indent(n: Integer | string = DEFAULT_TAB_SIZE): this {
     if (this._enabled) {
       if (isInteger(n)) {
-        this._tab = ' '.repeat(n - 1);
+        this._msgIndent = ' '.repeat(n - 1);
       } else if (isNonEmptyString(n)) {
-        this._tab = n;
+        this._msgIndent = n;
       }
     }
     return this;
@@ -152,7 +181,7 @@ export class LoggerLine {
    */
   tab(n: Integer = 1): this {
     if (this._enabled) {
-      this._tab = ' '.repeat(n * this._state.tabSize - 1);
+      this._msgIndent = ' '.repeat(n * this.tabSize - 1);
     }
     return this;
   }
@@ -165,7 +194,7 @@ export class LoggerLine {
    */
   data(arg: any): this {
     if (this._enabled) {
-      this._parts.push(JSON.stringify(arg, null, 2));
+      return this.addMsgPart(JSON.stringify(arg, null, DEFAULT_TAB_SIZE));
     }
     return this;
   }
@@ -180,22 +209,28 @@ export class LoggerLine {
     return this;
   }
 
+  addMsgPart(str: string, style?: StyleName): this {
+    const _style = this.stylizeEnabled ? style : undefined;
+    this._msgParts.push({ str: str, style: style });
+    return this;
+  }
+
   /**
    * Adds styled text to the log line.
    * @param {any} val - The value to stylize.
    * @param {StyleName | StyleDef} style - The style to use.
    * @returns {this} The Logger instance.
    */
-  stylize(style: StyleName | StyleDef, ...args): LoggerLineInstance {
+  stylize(style: StyleName, ...args): LoggerLineInstance {
     if (this._enabled && args.length) {
-      if (this._state.colorize && this._state.transport.supportsColor) {
-        const styleDef: StyleDef = isNonEmptyString(style)
-          ? this._state.style.styles[style]
-          : style;
-        this._parts.push(this._state.style.format(args.join(' '), styleDef));
-      } else {
-        this._parts.push(...args);
-      }
+      // const styleDef: StyleDef = isNonEmptyString(style) ? this._style.styles[style] : style;
+      this.addMsgPart(args.join(' '), style);
+      // if (this.stylizeEnabled && this._state.transport.supportsColor) {
+      //   const styleDef: StyleDef = isNonEmptyString(style) ? this._style.styles[style] : style;
+      //   this._msgParts.push(this._style.format(args.join(' '), styleDef));
+      // } else {
+      //   this._msgParts.push(...args);
+      // }
     }
     return this as unknown as LoggerLineInstance;
   }
@@ -207,7 +242,7 @@ export class LoggerLine {
    */
   plain(...args: any[]): this {
     if (this._enabled && isNonEmptyArray(args)) {
-      this._parts.push(...args);
+      this._msgParts.push(...args);
     }
     return this;
   }
@@ -256,10 +291,23 @@ export class LoggerLine {
         .addPlain(...args)
         .addSuffix()
         .addElapsed();
-      const line = this._parts.join(' ');
-      this._state.transport.write(this);
+      this._transports.forEach((transport) => {
+        this.emitForTransport(transport);
+      });
+      // const line = this._msgParts.join(' ');
+      // this._state.transport.write(this);
       this.clear();
     }
+  }
+
+  emitForTransport(lineTransport: LineTransportOpts): void {
+    this._transports.forEach((transportOpts) => {
+      let parts: string[] = [];
+      this._msgParts.forEach((part) => {
+        parts.push(transportOpts.style.format(part.str, part.style));
+      });
+      transportOpts.transport.write(parts.join(' '));
+    });
   }
 
   formatAsString(): string {
@@ -271,28 +319,32 @@ export class LoggerLine {
       .addAction()
       .addSuffix()
       .addElapsed();
-    return this._parts.join(' ');
+    return this._msgParts.join(' ');
   }
 
   protected addLevelPrefix() {
-    if (this._state.levelPrefix) {
+    if (this._showOpts.level) {
       let str = `[${getLogLevelString(this._level).toUpperCase()}]`;
-      this._parts.unshift(this._state.style.levelPrefix(rightPadAndTruncate(str, 9)));
+      const styleName = getLevelStyleName(this._level);
+      this.addMsgPart(rightPadAndTruncate(str, 9), styleName);
+      // this._msgParts.unshift(this._state.style[styleName](rightPadAndTruncate(str, 9)));
     }
     return this;
   }
 
   protected addTimePrefix(): this {
-    if (this._state.timePrefix) {
+    const timePrefix = this._showOpts.timestamp;
+    if (timePrefix) {
       let time = '';
-      if (this._state.timePrefix === 'elapsed') {
-        time = this._state.timer.measureFormatted().total;
-      } else if (this._state.timePrefix === 'local') {
+      if (timePrefix === 'elapsed') {
+        time = this._timer.measureFormatted().total;
+      } else if (timePrefix === 'local') {
         time = dateUtil(Date.now()).format('HH:mm:ss');
-      } else if (this._state.timePrefix === 'utc') {
+      } else if (timePrefix === 'utc') {
         time = dateUtil(Date.now()).tz('Z').format('HH:mm:ss');
       }
-      this._parts.unshift(this._state.style.timePrefix(time));
+      this.addMsgPart(time, '_timePrefix');
+      // this._msgParts.unshift(this._state.style.timePrefix(time));
     }
     return this;
   }
@@ -303,8 +355,9 @@ export class LoggerLine {
    * @returns {this} The LoggerLine instance.
    */
   protected addReqId(): this {
-    if (this._reqId) {
-      this._parts.unshift(this._state.style.reqId(this._reqId));
+    if (this._showOpts.reqId) {
+      this.addMsgPart(this._reqId, '_reqId');
+      // this._msgParts.unshift(this._state.style.reqId(this._reqId));
     }
     return this;
   }
@@ -314,42 +367,44 @@ export class LoggerLine {
    * @returns {this} The LoggerLine instance.
    */
   protected addSid(): this {
-    if (this._sid) {
-      this._parts.unshift(this._state.style.sid(this._sid));
+    if (this._showOpts.sid) {
+      this.addMsgPart(this._reqId, '_sid');
+      // this._msgParts.unshift(this._state.style.sid(this._sid));
     }
     return this;
   }
 
   protected addEmitter(): this {
-    if (this._emitter) {
-      this._parts.unshift(this._state.style.emitter(this._emitter));
+    if (this._showOpts.emitter) {
+      this.addMsgPart(this._reqId, '_emitter');
+      // this._msgParts.unshift(this._state.style.emitter(this._emitter));
     }
     return this;
   }
 
   protected addAction(): this {
-    if (this._action) {
-      this._parts.unshift(this._state.style.action(this._action));
+    if (this._showOpts.action) {
+      this.addMsgPart(this._reqId, '_action');
+      // this._msgParts.unshift(this._state.style.action(this._action));
     }
     return this;
   }
 
   protected addPlain(...args: any[]): this {
-    this._parts.push(...args);
+    this.addMsgPart(args.join(' '), '_plain');
     return this;
   }
 
   protected addSuffix(): this {
-    if (this._suffix.length) {
-      this.stylize('_suffix', ...this._suffix);
-    }
+    this.addMsgPart(this._suffix.join(' '), '_suffix');
     return this;
   }
 
   protected addElapsed(): this {
-    if (this._showElapsed) {
-      const et = this._state.timer.measureFormatted();
-      this.stylize('_elapsed', `${et.total} (${et.interval})`);
+    if (this._showElapsed && this._timer) {
+      const et = this._timer.measureFormatted();
+      this.addMsgPart(`${et.total} (${et.interval})`, '_elapsed');
+      // this.stylize('_elapsed', `${et.total} (${et.interval})`);
     }
     return this;
   }
@@ -362,7 +417,7 @@ export class LoggerLine {
    * @returns {string} - The parts of the line as a string.
    */
   partsAsString(): string {
-    return [...this._parts, ...this._suffix].join(' ');
+    return [...this._msgParts, ...this._suffix].join(' ');
   }
 
   /**
@@ -371,7 +426,7 @@ export class LoggerLine {
    */
   unitState(): Record<string, any> {
     return {
-      state: this._state,
+      showOpts: this._showOpts,
       enabled: this._enabled,
       elapsed: this._showElapsed,
       level: this._level
@@ -385,7 +440,7 @@ export class LoggerLine {
   private addStyleMethods(): this {
     const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
 
-    for (const name in this._state.style.styles) {
+    for (const name in this._lineFormat.style.styles) {
       if (!name.startsWith('_')) {
         if (methodNames.includes(name)) {
           throw new Error(`Cannot declare style with reserved name ${name}`);

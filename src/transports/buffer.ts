@@ -1,5 +1,12 @@
 import { LoggerLine } from '../line';
-import { LoggerTransport, TransportType } from './transport';
+import { LoggerTransport, TransportOptions } from './base';
+import { TransportType } from './factory';
+
+export type BufferTransportOptions = TransportOptions;
+
+export function getNewBufferTransport(options: BufferTransportOptions): BufferTransport {
+  return new BufferTransport(options);
+}
 
 export class BufferTransport extends LoggerTransport {
   protected _sType: TransportType = 'buffer';
@@ -7,6 +14,10 @@ export class BufferTransport extends LoggerTransport {
 
   get supportsColor(): boolean {
     return true;
+  }
+
+  get name(): TransportType {
+    return 'buffer';
   }
 
   write(msg: LoggerLine): void {

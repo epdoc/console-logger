@@ -1,11 +1,22 @@
 import { LoggerLine } from '../line';
-import { LoggerTransport, TransportType } from './transport';
+import { LoggerTransport, TransportOptions } from './base';
+import { TransportType } from './factory';
+
+export type ConsoleTransportOpts = TransportOptions & {
+  colorize?: boolean;
+};
+
+export function getNewConsoleTransport(options: ConsoleTransportOpts): ConsoleTransport {
+  return new ConsoleTransport(options);
+}
 
 export class ConsoleTransport extends LoggerTransport {
-  protected _sType: TransportType = 'console';
-
   get supportsColor(): boolean {
     return true;
+  }
+
+  get name(): TransportType {
+    return 'console';
   }
 
   // var ConsoleTransportOld = function (options) {

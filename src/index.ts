@@ -3,5 +3,5 @@ export * from './levels';
 export * from './line';
 export * from './logger';
 export * from './state';
-export * from './style';
+export * from './styles/color';
 export * from './util';

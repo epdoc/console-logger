@@ -1,12 +1,20 @@
-import { isArray, isDefined, isNonEmptyString, isString } from '@epdoc/typeutil';
-import path from 'node:path';
+import { isArray, isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
 import { AppTimer, Microseconds } from './apptimer';
-import { logLevel, LogLevelValue } from './levels';
-import { LoggerLineInstance } from './line';
+import { logLevel, LogLevelValue, meetsLogThreshold } from './levels';
 import { Logger, LoggerOptions } from './logger';
-import { LoggerTransport, TransportOptions, TransportType } from './transports/transport';
+import { TransportFactory } from './transports';
+import { LoggerTransport, TransportOptions } from './transports/base';
+import {
+  GetLoggerOptions,
+  LoggerRunOpts,
+  LoggerShowOpts,
+  LogManagerOptions,
+  LogMessage,
+  SeparatorOpts
+} from './types';
 
 let mgrIdx = 0;
+const startTime: Microseconds = performance.now();
 
 /**
  * Create a new LogManager object with no transports. Logged messages will not begin
@@ -29,139 +37,70 @@ let mgrIdx = 0;
  *   various options.
  * @constructor
  */
-let LogManagerOld = function (options) {
-  options || (options = {});
-  this.name = 'LogManager#' + ++mgrIdx;
-  this.t0 = options.t0 ? options.t0.getTime() : new Date().getTime();
-  // Count of how many errors, warnings, etc
-  this.logCount = {};
 
-  this.setOptions(options);
-};
-
-export type LogManagerOptions = {
-  /**
-   * Timer instance used for logging timestamps.
-   * @type {AppTimer}
-   */
-  timer: AppTimer;
-
-  /**
-   * Indicates whether to show the session ID in log output.
-   * @type {boolean}
-   */
-  showSid: boolean;
-
-  /**
-   * Indicates whether to show a static column in log output.
-   * @type {boolean}
-   */
-  showStatic: boolean;
-
-  /**
-   * The log level at which messages will be logged.
-   * Must be one of the predefined log levels.
-   * @type {LogLevelValue}
-   */
-  defaultLevel: LogLevelValue;
-
-  /**
-   * Character used for separator lines in log output.
-   * @type {string}
-   */
-  sepChar: string;
-
-  /**
-   * Length of separator lines in log output.
-   * @type {number}
-   */
-  sepLen: number;
-
-  /**
-   * Indicates whether to include the error stack in the log output
-   * when logging Error objects.
-   * @type {boolean}
-   */
-  errorStack: boolean;
-
-  /**
-   * Array of transport options for logging.
-   * Each transport must include a 'type' property.
-   * @type {TransportOptions[]}
-   */
-  transports: TransportOptions[];
-
-  /**
-   * If true, logging will be enabled immediately without needing to call start().
-   * If no transports are provided, a default console transport will be added.
-   * @type {boolean}
-   */
-  autoRun: boolean;
-
-  /**
-   * If true, all transports must be ready before messages are written.
-   * If false, messages can be written as soon as any transport is ready.
-   * @type {boolean}
-   */
-  allTransportsReady: boolean;
-
-  /**
-   * Options for the console transport.
-   * @type {TransportOptions}
-   */
-  consoleOptions: TransportOptions;
-};
+export type LogManagerCount = Partial<Record<LogLevelValue, number>>;
 
 export class LogManager {
-  private _options: LogManagerOptions;
-  private _timer: AppTimer;
-  private _showSid: boolean;
-  private _showStatic: boolean;
-  private _defaultLevel: LogLevelValue;
-  private _sepChar: string;
-  private _sepLen: number;
-  private _includeErrorStack: boolean;
-  private _transports: LoggerTransport[] = [];
-  private _autoRun: boolean;
-  private _allTransportsReady: boolean;
-  private _queue: LoggerLineInstance[] = [];
+  protected _showOpts: LoggerShowOpts;
+  protected _separatorOpts: SeparatorOpts;
+  protected _runOpts: LoggerRunOpts;
+  protected _timer: AppTimer;
+  protected _levelThreshold: LogLevelValue;
+  protected _errorStackThreshold: LogLevelValue;
+
+  protected _transports: LoggerTransport[] = [];
+  protected _queue: LogMessage[] = [];
   /** have we started logging? */
-  private _running: boolean;
+  protected _running: boolean = false;
+
+  protected _transportFactory: TransportFactory = new TransportFactory();
+  protected _count: LogManagerCount = {};
 
   constructor(options: LogManagerOptions) {
-    this._options = options;
     this.setOptions(options);
   }
 
   setOptions(options: LogManagerOptions) {
-    this._timer = options.timer;
-    this._showSid = options.showSid === true ? true : false;
-    this._showStatic = options.showStatic === true ? true : false;
-    // Default threshold level for outputting logs
-    this._defaultLevel = options.defaultLevel || logLevel.info;
-    this._sepLen = options.sepLen ? options.sepLen : 70;
-    this._sepChar = options.sepChar ? options.sepChar : '#';
+    this._showOpts = options.show ??= {};
+    this._timer = options.timer ??= new AppTimer(startTime);
+    this._runOpts = options.run ??= { autoRun: true, allTransportsReady: true };
+    this._levelThreshold = options.levelThreshold ??= logLevel.info;
+    this._errorStackThreshold = options.errorStackThreshold ??= logLevel.error;
+    this._separatorOpts = options.separatorOpts ??= { char: '#', length: 70 };
     // this._sep = Array(this._sepLen).join(this._sepChar);
-    this._includeErrorStack = options.errorStack === true ? true : false;
+
     this._running = false;
-    this._allTransportsReady = options.allTransportsReady === false ? false : true;
-    this._transports = [];
-    let transportArray = [];
     if (isArray(options.transports)) {
-      transportArray = options.transports;
-    } else if (options.transports) {
-      transportArray.push(options.transports);
+      options.transports.forEach((transport) => {
+        this.addTransport(transport);
+      });
     }
-    if (transportArray.length) {
-      for (let tdx = 0; tdx < transportArray.length; tdx++) {
-        this.addTransport(transportArray[tdx], options[transportArray[tdx]]);
-      }
-    } else {
-      // this.consoleOptions = options.console;
+  }
+
+  start(): Promise<any> {
+    if (!this._running) {
+      return Promise.resolve()
+        .then(() => {
+          if (this._runOpts.autoRun === true) {
+            return this.startTransports();
+          }
+        })
+        .then(() => {
+          return this.start();
+        })
+        .then(() => {
+          this._running = true;
+          return this.flushQueue();
+        });
     }
-    if (options.autoRun === true) {
-      this.start();
+  }
+
+  addTransport(options: TransportOptions): LoggerTransport {
+    const transport = this._transportFactory.getTransport(options.name, options);
+    if (transport) {
+      this._transports.push(transport);
     }
+    return transport;
   }
 
   /**
@@ -174,38 +113,28 @@ export class LogManager {
    *   not normally necessary to wait for this callback.
    * @return {LogManager}
    */
-  start(): Promise<any> {
-    if (!this._running) {
-      let jobs = [];
-      if (!this._transports.length) {
-        this.addTransport('console', this._options.consoleOptions);
-      }
-      if (this._transports.length) {
-        this._transports.forEach((transport) => {
-          jobs.push(this.startingTransport(transport));
-        });
-      }
-      return Promise.all(jobs)
-        .then(() => {
-          return this.start();
-        })
-        .then(() => {
-          this._running = true;
-          return this.flushQueue();
-        });
+  startTransports(): Promise<any> {
+    let jobs = [];
+    if (!this._transports.length) {
+      this.addTransport({ name: 'console' });
     }
+    this._transports.forEach((transport) => {
+      jobs.push(this.startTransport(transport));
+    });
+
+    return Promise.all(jobs);
   }
 
-  startingTransport(transport: LoggerTransport): Promise<void> {
+  startTransport(transport: LoggerTransport): Promise<void> {
     return transport
       .open()
       .then(() => {
         transport.clear();
-        // this.logMessage(
-        //   this.LEVEL_INFO,
-        //   'logger.start.success',
-        //   "Started transport '" + transport.type + "'",
-        //);
+        this.logLogMgrMessage({
+          level: logLevel.info,
+          action: 'logger.start.success',
+          message: `Started transport ${transport.name}`
+        });
       })
       .catch((err) => {
         // this.logMessage(
@@ -217,102 +146,29 @@ export class LogManager {
       });
   }
 
+  logger(options: GetLoggerOptions): LoggerInstance {
+    const opts: LoggerOptions = {
+      show: this._showOpts,
+      separatorOpts: this._separatorOpts,
+      run: this._runOpts,
+      transports: []
+    };
+    if (isNonEmptyArray(options.transports)) {
+      options.transports.forEach((transportOptions) => {
+        const transport = this.addTransport(transportOptions);
+        opts.transports.push(transport);
+      });
+    } else {
+      opts.transports = this._transports;
+    }
+    return new Logger(null, opts);
+  }
+
   // function onClose() {
   //   this.logMessage(this.LEVEL_INFO, 'logger.close', "Closed transport '" + name + "'");
   //   this.removeTransport(transport);
   // }
   //}
-
-  /**
-   * Add a log transport. Multiple transports can be in operation at the same time, allowing log
-   * messages to be sent to more than one destination.
-   * If you are adding a transport while logging is on, you should first call logMgr.stopping,
-   * add the transport, then call logMgr.start.
-   *
-   * @param {string|Object} [type] - For the provided loggers, one of 'sos', 'file', 'callback',
-   *   'console' or 'loggly'. For a custom transport this should be a transport class object that
-   *   can be instantiated with 'new'. To create your own transport class, consider using
-   *   getLoggerClass('console') and then subclassing this class. If the params option contains a
-   *   'type' property, this field is optional.
-   * @param options {Object} These are directly passed to the transport when constructing the new
-   *   transport object. Please refer to the individual transport for properties. Some common
-   *   properties are listed here.
-   * @param [options.sid] {boolean} - If true then output express request and session IDs,
-   *   otherwise do not output these values. Default is to use LogManager's sid setting.
-   * @param [options.timestamp=ms] {string} - Set the format for timestamp output, must be one of
-   *   'ms' or 'iso'.
-   * @param [options.static=true] {boolean} - Set whether to output a 'static' column. By default
-   *   this inherits the value from the LogManager.
-   * @param [options.level=debug] {string} - Log level for this transport.
-   * @return {LogManager}
-   */
-  addTransport(type: TransportType, options: TransportOptions): this {
-    let newTransport = this._getNewTransport(type, options);
-    if (newTransport) {
-      this._running = false;
-      this._transports.unshift(newTransport);
-      let name = newTransport.toString();
-      let topts = newTransport.getOptions();
-      let sOptions = topts ? ' (' + JSON.stringify(topts) + ')' : '';
-      // this.logMessage(
-      //   this.LEVEL_INFO,
-      //   'logger.transport.add',
-      //   "Added transport '" + name + "'" + sOptions,
-      //   { transport: name, options: topts }
-      // );
-    }
-    return this;
-  }
-
-  _getNewTransport(type: TransportType | LoggerTransport, options: TransportOptions) {
-    let t: TransportType;
-    if (type instanceof LoggerTransport) {
-      t = type.type;
-    } else if (isString(type)) {
-      t = type;
-    }
-    if (!isDefined(options.sid)) {
-      options.sid = this._sid;
-    }
-    if (!isDefined(options.static)) {
-      options.static = this.static;
-    }
-    if (!isDefined(options.level)) {
-      options.level = this.logLevel;
-    }
-
-    let Transport;
-    let name: TransportType;
-
-    if (type) {
-      let p = path.resolve(__dirname, 'transports', type);
-      Transport = import(p);
-      name = type;
-    } else if (options) {
-      Transport = type;
-    } else {
-      let p = path.resolve(__dirname, 'transports/console');
-      Transport = import(p);
-      name = 'console';
-    }
-
-    if (Transport) {
-      let newTransport = new Transport(options);
-      let err = newTransport.validateOptions();
-      if (!err) {
-        return newTransport;
-      } else {
-        // this.logMessage(
-        //   this.LEVEL_WARN,
-        //   'logger.transport.add.warn',
-        //   "Could not add transport '" + name + "'. " + err.message,
-        //   { options: options }
-        // );
-        return;
-      }
-    }
-    return this;
-  }
 
   /**
    * Remove a particular transport. Pauses log output. The caller should call [start()]{@link
@@ -331,12 +187,12 @@ export class LogManager {
     this._transports.forEach((t) => {
       if (transport.id === t.id) {
         jobs.push(t.stop());
-        // this.logMessage(
-        //   this.LEVEL_INFO,
-        //   'logger.transport.remove',
-        //   "Removed transport '" + t.toString() + "'",
-        //   { transport: t.toString() }
-        // );
+        this.logLogMgrMessage(
+          logLevel.info,
+          'logger.transport.remove',
+          `Removed transport ${t.toString()}`,
+          { transport: t.toString() }
+        );
       } else {
         remainingTransports.push(t);
       }
@@ -391,12 +247,12 @@ export class LogManager {
   private flushQueue() {
     if (this._running && this._queue.length) {
       if (this._transports.length) {
-        if (!this._allTransportsReady || this.checkIfAllTransportsAreReady()) {
-          let nextMsg: LoggerLineInstance = this._queue.shift();
+        if (this._runOpts.allTransportsReady || !this.checkIfAllTransportsAreReady()) {
+          let nextMsg: LoggerMessage = this._queue.shift();
           if (nextMsg) {
             this._transports.forEach((transport) => {
               let logLevel = transport.level || nextMsg._logLevel || this.logLevel;
-              if (this.isAboveLevel(nextMsg.level, logLevel)) {
+              if (meetsLogThreshold(nextMsg.level, logLevel)) {
                 nextMsg._logLevel = undefined;
                 transport.write(nextMsg);
               }
@@ -475,11 +331,9 @@ export class LogManager {
    * @return {LogManager}
    * @see {LogManager#logParams}
    */
-  logMessage(level, action, message, data) {
-    let params = { emitter: 'logger', level: level, action: action, message: message };
-    if (data) {
-      params.data = data;
-    }
+  logLogMgrMessage(msg: LogMessage) {
+    //level: LogLevelValue, action: string, message: string, data: Dict) {
+    let params = Object.assign({ emitter: 'logger' }, msg);
     return this.logParams(params);
   }
 
@@ -506,24 +360,16 @@ export class LogManager {
    *   setting set for the transport.
    * @return {LogManager}
    */
-  logParams(msgParams, logLevel) {
-    if (msgParams) {
-      if (!msgParams.level) {
-        msgParams.level = this.LEVEL_INFO;
-      }
-      // Set for later comparison
-      msgParams._logLevel = logLevel || this.logLevel;
-      if (!msgParams.time) {
-        msgParams.time = new Date();
-      }
-      if (!msgParams.timeDiff) {
-        msgParams.timeDiff = msgParams.time.getTime() - this.t0;
-      }
-      this.queue.push(msgParams);
-      if (msgParams.length && msgParams.message && msgParams.message.length > msgParams.length) {
-        msgParams.message = msgParams.message.substr(0, msgParams.length) + '...';
-      }
-      this.logCount[msgParams.level] = 1 + (this.logCount[msgParams.level] || 0);
+  logParams(msgParams: LogMessage) {
+    let params = Object.assign({ level: logLevel.info }, msgParams);
+    if (msgParams && meetsLogThreshold(msgParams.level, this._showOpts.levelThreshold)) {
+      this._queue.push(msgParams);
+      // if (msgParams.length && msgParams.message && msgParams.message.length > msgParams.length) {
+      //   msgParams.message = msgParams.message.substr(0, msgParams.length) + '...';
+      // }
+      this._count[msgParams.level] = this._count[msgParams.level]
+        ? 1
+        : this._count[msgParams.level] + 1;
     }
     return this.flushQueue();
   }
@@ -536,13 +382,10 @@ export class LogManager {
    * @return {LogManager}
    */
   setLevel(level, options) {
-    this.logLevel = level;
-    if (this.transports) {
-      for (let tdx = 0; tdx < this.transports.length; tdx++) {
-        let transport = this.transports[tdx];
-        transport.setLevel(level);
-      }
-    }
+    this._showOpts.levelThreshold = level;
+    this._transports.forEach((transport) => {
+      transport.setLevelThreshold(level);
+    });
     return this;
   }
 
@@ -555,12 +398,8 @@ export class LogManager {
    *   LogManager#logLevel}.
    * @return {boolean}
    */
-  isAboveLevel(level, thresholdLevel) {
-    let threshold = thresholdLevel || this.logLevel;
-    if (this.LEVEL_ORDER.indexOf(level) >= this.LEVEL_ORDER.indexOf(threshold)) {
-      return true;
-    }
-    return false;
+  isAboveLevel(level: LogLevelValue, thresholdLevel: LogLevelValue) {
+    return meetsLogThreshold(level, thresholdLevel);
   }
 
   /**
@@ -569,13 +408,14 @@ export class LogManager {
    * @param {string} [message]
    * @return {LogManager}
    */
-  writeCount(message) {
-    return this.logParams({
+  writeCount(message: string) {
+    const msg: LogMessage = {
       emitter: 'logger',
       action: 'counts',
-      data: this.logCount,
+      data: this._count,
       message: message
-    });
+    };
+    return this.logParams(msg);
   }
 
   /**

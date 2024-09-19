@@ -1,10 +1,10 @@
-import { Color, Style, StyleDef, StyleOptions } from '../src';
+import { Color, ColorStyle, ColorStyleOpts, StyleDef } from '../src';
 
 describe('Style Class', () => {
-  let style: Style;
+  let style: ColorStyle;
 
   beforeEach(() => {
-    style = new Style();
+    style = new ColorStyle();
   });
 
   describe('Constructor', () => {
@@ -14,12 +14,12 @@ describe('Style Class', () => {
     });
 
     it('should initialize with custom styles', () => {
-      const customStyles: StyleOptions = {
+      const customStyles: ColorStyleOpts = {
         styles: {
           custom: { fg: Color.red }
         }
       };
-      style = new Style(customStyles);
+      style = new ColorStyle(customStyles);
       expect(style.styles.custom.fg).toBe(Color.red);
     });
   });

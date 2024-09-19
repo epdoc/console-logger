@@ -1,4 +1,4 @@
-import { LoggerState, logLevel, Style } from '../src';
+import { ColorStyle, LoggerState, logLevel } from '../src';
 
 describe('LoggerState Class', () => {
   let loggerState: LoggerState;
@@ -35,7 +35,7 @@ describe('LoggerState Class', () => {
 
   describe('setStyle method', () => {
     it('should set the style correctly', () => {
-      const newStyle = new Style();
+      const newStyle = new ColorStyle();
       loggerState.setStyle(newStyle);
       expect(loggerState.style).toBe(newStyle);
     });

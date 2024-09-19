@@ -1,32 +1,17 @@
 import { Integer } from '@epdoc/typeutil';
 import { isLogLevelValue, logLevel, LogLevelValue } from '../levels';
-import { LoggerLine, LoggerLineInstance } from '../line';
-import { TimePrefix } from '../state';
+import { LoggerLineInstance } from '../line';
+import { LoggerLineFormatOpts, LoggerShowOpts, TimePrefix } from '../types';
+import { TransportType } from './factory';
 
 let transportId = 0;
 
-export type TransportType =
-  | 'console'
-  | 'buffer'
-  | 'file'
-  | 'socket'
-  | 'http'
-  | 'https'
-  | 'stream'
-  | 'wss'
-  | 'ws';
-
 export type TransportOptions = Partial<{
-  level: LogLevelValue;
-  timePrefix: TimePrefix;
-  levelPrefix: boolean;
-  sid: boolean;
-  reqId: boolean;
-  emitter: boolean;
-  action: boolean;
-  static: boolean;
-  colorize: boolean;
-  message: boolean;
+  name: TransportType; // not required internally
+  show: LoggerShowOpts;
+  time: TimePrefix;
+  levelThreshold: LogLevelValue;
+  format: LoggerLineFormatOpts;
 }>;
 
 export type LogMessage = {
@@ -42,26 +27,32 @@ export type LogMessage = {
 export class LoggerTransport {
   protected _id: Integer;
   protected _bReady: boolean = false;
-  protected _sType: TransportType = undefined;
-  protected _level: LogLevelValue = logLevel.info;
+  protected _levelThreshold: LogLevelValue = logLevel.info;
   protected _options: TransportOptions = {};
 
   constructor(options: TransportOptions) {
-    this.setLevel(options.level);
+    this.setLevelThreshold(options.levelThreshold);
     this._options = options;
     this._id = transportId++;
   }
 
-  get type(): TransportType {
-    return this._sType;
+  get name(): TransportType {
+    return undefined;
   }
 
   get id(): string {
-    return `${this._sType}:${this._id}`;
+    return `${this.name}:${this._id}`;
   }
 
   get supportsColor(): boolean {
     return false;
+  }
+
+  setLevelThreshold(level: LogLevelValue): this {
+    if (isLogLevelValue(level)) {
+      this._levelThreshold = level;
+    }
+    return this;
   }
 
   validateOptions() {
@@ -88,6 +79,8 @@ export class LoggerTransport {
     return Promise.resolve(true);
   }
 
+  write(str: string): void {}
+
   async flush(): Promise<void> {
     return Promise.resolve();
   }
@@ -99,19 +92,6 @@ export class LoggerTransport {
   async end(): Promise<void> {
     this._bReady = false;
     return Promise.resolve();
-  }
-
-  write(params: LoggerLine): void {}
-
-  setLevel(level: LogLevelValue): this {
-    if (isLogLevelValue(level)) {
-      this._level = level;
-    }
-    return this;
-  }
-
-  toString() {
-    return 'Console';
   }
 
   getOptions() {
