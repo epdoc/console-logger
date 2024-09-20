@@ -1,8 +1,7 @@
-import { getLogLevelString, LogLevelValue } from '../levels';
 import { Color, isValidColor } from '../util';
-import { BaseStyle, StyleOptions } from './base';
+import { Style, StyleOptions } from './base';
 
-export type StyleDef = {
+export type ColorStyleDef = {
   fg?: Color;
   bg?: Color;
 };
@@ -17,7 +16,7 @@ export type StyleDef = {
  * each of these styles. Styles that begin with an underscore are only added as
  * style methods to the Style class.
  */
-export const styles = {
+export const colorStyles = {
   text: { fg: Color.white },
   h1: { fg: Color.magenta },
   h2: { fg: Color.magenta },
@@ -40,41 +39,46 @@ export const styles = {
   _elapsed: { fg: Color.dark_gray },
   _errorPrefix: { fg: Color.dark_red },
   _warnPrefix: { fg: Color.cyan },
-  _levelPrefix: { fg: Color.dark_gray },
+  _infoPrefix: { fg: Color.dark_gray },
+  _verbosePrefix: { fg: Color.dark_gray },
+  _debugPrefix: { fg: Color.dark_gray },
+  _sillyPrefix: { fg: Color.dark_gray },
+  _httpPrefix: { fg: Color.dark_gray },
   _timePrefix: { fg: Color.dark_gray }
 } as const;
 
-export type ColorStyleName = keyof typeof styles;
+export type ColorStyleName = keyof typeof colorStyles;
 
 export type ColorStyleOpts = StyleOptions & {
-  styles?: Record<string, StyleDef>;
+  styles?: Record<string, ColorStyleDef>;
 };
 
-export class ColorStyle extends BaseStyle {
-  public readonly styles: Record<string, StyleDef>;
-  [key: string]: ((val: any) => string) | any;
+export class ColorStyle extends Style {
+  // public readonly _styles: Record<string, ColorStyleDef>;
+  // [key: string]: ((val: any) => string) | any;
 
   constructor(options: ColorStyleOpts = {}) {
+    options.styles = options.styles ??= colorStyles;
     super(options);
-    this.styles = Object.assign({}, options.styles ? options.styles : styles);
-    this.addStyleMethods();
+    // this._styles = Object.assign({}, options.styles ? options.styles : colorStyles);
+    // this.addStyleMethods();
   }
 
-  get styles(): ColorStyleName[] {
-    return Object.keys(styles);
+  get styleNames(): ColorStyleName[] {
+    return Object.keys(colorStyles) as ColorStyleName[];
   }
 
-  getStyleDef(name: ColorStyleName): StyleDef {
-    return this.styles[name];
+  getDefFromName(name: ColorStyleName): ColorStyleDef {
+    return this._styles[name];
   }
 
-  getLevelStyleName(level: LogLevelValue): ColorStyleName {
-    const styleName = `${getLogLevelString(level)}Prefix` as ColorStyleName;
-    if (styles['_' + styleName]) {
-      return styleName;
-    }
-    return '_levelPrefix';
-  }
+  // getLevelStyleName(level: LogLevelValue): ColorStyleName {
+  //   const styleName = `${getLogLevelString(level)}Prefix` as ColorStyleName;
+  //   if (styles['_' + styleName]) {
+  //     return styleName;
+  //   }
+  //   return '_levelPrefix';
+  // }
 
   // addStyleMethods() {
   //   for (const name in this.styles) {
@@ -86,15 +90,15 @@ export class ColorStyle extends BaseStyle {
   /**
    * Adds a style to the style map or replace an existing style
    * @param {string} name - The name of the style.
-   * @param {StyleDef} styleDef - The style definition.
+   * @param {ColorStyleDef} styleDef - The style definition.
    */
   // addStyle(name: string, styleDef: StyleDef) {
   //   this.styles[name] = styleDef;
   // }
 
-  format(val: any, style: ColorStyleName | StyleDef): string {
+  format(val: any, style: ColorStyleName | ColorStyleDef): string {
     const s = super.format(val);
-    let styleDef = typeof style === 'string' ? this.styles[style] : style;
+    let styleDef = typeof style === 'string' ? this._styles[style] : style;
     if (!styleDef) {
       return s;
     } else if (styleDef) {

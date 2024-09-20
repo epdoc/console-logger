@@ -2,7 +2,7 @@ import { Dict, Integer } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { LogLevelValue } from './levels';
 import { LoggerLineInstance } from './line';
-import { StyleInstance } from './styles/color';
+import { Style } from './styles';
 import { LoggerTransport, TransportOptions } from './transports';
 
 export type TimePrefix = 'local' | 'utc' | 'elapsed' | false;
@@ -14,7 +14,7 @@ export function isValidTimePrefix(val: any): val is TimePrefix {
 export type LoggerLineFormatOpts = Partial<{
   tabSize: Integer;
   stylize: boolean;
-  style: StyleInstance;
+  style: Style;
 }>;
 
 export type LoggerShowOpts = Partial<{
@@ -26,12 +26,15 @@ export type LoggerShowOpts = Partial<{
   emitter: boolean;
   action: boolean;
   data: boolean;
+  elapsed: boolean; // not sure if we will show this
 }>;
 
 export type LineTransportOpts = Partial<{
   transport: LoggerTransport;
-  style: StyleInstance;
+  show: LoggerShowOpts;
+  style: Style;
   levelThreshold: LogLevelValue;
+  lineFormat: LoggerLineFormatOpts;
 }>;
 
 export type LoggerLineOpts = {

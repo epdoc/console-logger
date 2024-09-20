@@ -1,4 +1,4 @@
-import { Color, ColorStyle, ColorStyleOpts, StyleDef } from '../src';
+import { Color, ColorStyle, ColorStyleDef, ColorStyleOpts } from '../src';
 
 describe('Style Class', () => {
   let style: ColorStyle;
@@ -9,8 +9,8 @@ describe('Style Class', () => {
 
   describe('Constructor', () => {
     it('should initialize with default styles', () => {
-      expect(style.styles).toHaveProperty('text');
-      expect(style.styles.text.fg).toBe(Color.white);
+      expect(style._styles).toHaveProperty('text');
+      expect(style._styles.text.fg).toBe(Color.white);
     });
 
     it('should initialize with custom styles', () => {
@@ -20,15 +20,15 @@ describe('Style Class', () => {
         }
       };
       style = new ColorStyle(customStyles);
-      expect(style.styles.custom.fg).toBe(Color.red);
+      expect(style._styles.custom.fg).toBe(Color.red);
     });
   });
 
   describe('addStyle method', () => {
     it('should add a new style', () => {
-      const newStyle: StyleDef = { fg: Color.blue };
+      const newStyle: ColorStyleDef = { fg: Color.blue };
       style.addStyle('newStyle', newStyle);
-      expect(style.styles.newStyle).toEqual(newStyle);
+      expect(style._styles.newStyle).toEqual(newStyle);
     });
   });
 

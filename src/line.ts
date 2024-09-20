@@ -1,11 +1,12 @@
-import { dateUtil } from '@epdoc/timeutil';
-import { Integer, isInteger, isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
+import { Integer, isNonEmptyArray } from '@epdoc/typeutil';
+import { MethodName } from './../dist/src/style.d';
 import { AppTimer } from './apptimer';
-import { getLogLevelString, logLevel, LogLevelValue } from './levels';
+import { logLevel, LogLevelValue } from './levels';
 import { Logger } from './logger';
-import { getLevelStyleName, MethodName, StyleDef, StyleName } from './styles/color';
+import { defaultStyles, StyleName } from './styles/base';
+import { TransportLine } from './transport-line';
 import { TransportType } from './transports';
-import { LineTransportOpts, LoggerLineFormatOpts, LoggerLineOpts, LoggerShowOpts } from './types';
+import { LineTransportOpts, LoggerLineFormatOpts } from './types';
 
 const DEFAULT_TAB_SIZE = 2;
 
@@ -26,10 +27,11 @@ type MsgPart = {
  */
 export class LoggerLine {
   protected _logger: Logger;
-  protected _showOpts: LoggerShowOpts;
-  protected _lineFormat: LoggerLineFormatOpts;
+  // protected _showOpts: LoggerShowOpts;
+  // protected _lineFormat: LoggerLineFormatOpts;
   // protected _style: StyleInstance;
-  protected _transports: LineTransportOpts[];
+  protected _transportOpts: LineTransportOpts[];
+  protected _transportLines: TransportLine[];
   protected _msgIndent: string = '';
   protected _msgParts: MsgPart[] = [];
   protected _suffix: string[] = [];
@@ -41,14 +43,13 @@ export class LoggerLine {
   protected _sid: string;
   protected _emitter: string;
   protected _action: string;
-  protected _enabled = false;
 
-  constructor(options: LoggerLineOpts, levelThreshold: LogLevelValue = logLevel.info) {
-    this._showOpts = options.show;
-    this._lineFormat = options.lineFormat;
-    // this._style = options.lineFormat.style ??= new Style() as StyleInstance;
-    this._transports = options.transports;
-    this._levelThreshold = levelThreshold;
+  constructor(lineTransports: LineTransportOpts[]) {
+    lineTransports.forEach((transportOpts) => {
+      const transportLine = new TransportLine(transportOpts);
+      this._transportLines.push(transportLine);
+    });
+    // this.disableIfAllThresholdsNotMet();
     this.addStyleMethods();
   }
 
@@ -60,26 +61,13 @@ export class LoggerLine {
     return this._msgParts.length === 0;
   }
 
-  get stylizeEnabled(): boolean {
-    return this._lineFormat.stylize ?? false;
-  }
+  // get stylizeEnabled(): boolean {
+  //   return this._lineFormat.stylize ?? false;
+  // }
 
   // get style(): StyleInstance {
   //   return this._style;
   // }
-
-  /**
-   * Enables logging for this line of output. This will be set true by
-   * `Logger.initLine()` if the log level for this line is higher than the log
-   * level set for the Logger. By inspecting this value, we can determine if
-   * formatting and other code can be skipped, thus improving performance by a
-   * picosecond.
-   * @returns {this} The LoggerLine instance.
-   */
-  enable(): this {
-    this._enabled = true;
-    return this;
-  }
 
   /**
    * For logging in an Express or Koa environment, sets the request ID for this
@@ -130,10 +118,9 @@ export class LoggerLine {
    * @returns {this} The LoggerLine instance.
    */
   clear(): this {
-    this._enabled = false;
     this._showElapsed = false;
     this._action = undefined;
-    this._msgParts = [];
+    this._transportLines.forEach((transportLine) => transportLine.clear());
     this._suffix = [];
     return this;
   }
@@ -150,12 +137,8 @@ export class LoggerLine {
   }
 
   level(val: LogLevelValue): this {
-    this._level = val;
+    this._transportLines.forEach((transportLine) => transportLine.level(val));
     return this;
-  }
-
-  get tabSize(): Integer {
-    return (this._lineFormat.tabSize ??= DEFAULT_TAB_SIZE);
   }
 
   /**
@@ -164,13 +147,7 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   indent(n: Integer | string = DEFAULT_TAB_SIZE): this {
-    if (this._enabled) {
-      if (isInteger(n)) {
-        this._msgIndent = ' '.repeat(n - 1);
-      } else if (isNonEmptyString(n)) {
-        this._msgIndent = n;
-      }
-    }
+    this._transportLines.forEach((transportLine) => transportLine.indent(n));
     return this;
   }
 
@@ -180,9 +157,7 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   tab(n: Integer = 1): this {
-    if (this._enabled) {
-      this._msgIndent = ' '.repeat(n * this.tabSize - 1);
-    }
+    this._transportLines.forEach((transportLine) => transportLine.tab(n));
     return this;
   }
 
@@ -193,9 +168,8 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   data(arg: any): this {
-    if (this._enabled) {
-      return this.addMsgPart(JSON.stringify(arg, null, DEFAULT_TAB_SIZE));
-    }
+    const str = JSON.stringify(arg, null, DEFAULT_TAB_SIZE);
+    this._transportLines.forEach((transportLine) => transportLine.addMsgPart(str));
     return this;
   }
 
@@ -205,12 +179,12 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   comment(...args: string[]): this {
-    this._suffix.push(...args);
+    this._transportLines.forEach((transportLine) => transportLine.appendSuffix(...args));
     return this;
   }
 
   addMsgPart(str: string, style?: StyleName): this {
-    const _style = this.stylizeEnabled ? style : undefined;
+    // const _style = this.stylizeEnabled ? style : undefined;
     this._msgParts.push({ str: str, style: style });
     return this;
   }
@@ -222,15 +196,8 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   stylize(style: StyleName, ...args): LoggerLineInstance {
-    if (this._enabled && args.length) {
-      // const styleDef: StyleDef = isNonEmptyString(style) ? this._style.styles[style] : style;
-      this.addMsgPart(args.join(' '), style);
-      // if (this.stylizeEnabled && this._state.transport.supportsColor) {
-      //   const styleDef: StyleDef = isNonEmptyString(style) ? this._style.styles[style] : style;
-      //   this._msgParts.push(this._style.format(args.join(' '), styleDef));
-      // } else {
-      //   this._msgParts.push(...args);
-      // }
+    if (args.length) {
+      this._transportLines.forEach((transportLine) => transportLine.stylize(style, ...args));
     }
     return this as unknown as LoggerLineInstance;
   }
@@ -241,8 +208,8 @@ export class LoggerLine {
    * @returns {this} The Logger instance.
    */
   plain(...args: any[]): this {
-    if (this._enabled && isNonEmptyArray(args)) {
-      this._msgParts.push(...args);
+    if (isNonEmptyArray(args)) {
+      this._transportLines.forEach((transportLine) => transportLine.appendMsg(...args));
     }
     return this;
   }
@@ -284,154 +251,46 @@ export class LoggerLine {
    * @see emitWithTime()
    */
   emit(...args: any[]): void {
-    if (this._enabled) {
-      this.addPlain(...args);
-      this.addLevelPrefix()
-        .addTimePrefix()
-        .addPlain(...args)
-        .addSuffix()
-        .addElapsed();
-      this._transports.forEach((transport) => {
-        this.emitForTransport(transport);
-      });
-      // const line = this._msgParts.join(' ');
-      // this._state.transport.write(this);
-      this.clear();
-    }
+    this.plain(...args);
+    this._transportLines.forEach((transportLine) => transportLine.emit());
+    this.clear();
   }
 
-  emitForTransport(lineTransport: LineTransportOpts): void {
-    this._transports.forEach((transportOpts) => {
-      let parts: string[] = [];
-      this._msgParts.forEach((part) => {
-        parts.push(transportOpts.style.format(part.str, part.style));
-      });
-      transportOpts.transport.write(parts.join(' '));
-    });
-  }
+  // formatAsString(): string {
+  //   this.addLevelPrefix()
+  //     .addTimePrefix()
+  //     .addReqId()
+  //     .addSid()
+  //     .addEmitter()
+  //     .addAction()
+  //     .addSuffix()
+  //     .addElapsed();
+  //   return this._msgParts.join(' ');
+  // }
 
-  formatAsString(): string {
-    this.addLevelPrefix()
-      .addTimePrefix()
-      .addReqId()
-      .addSid()
-      .addEmitter()
-      .addAction()
-      .addSuffix()
-      .addElapsed();
-    return this._msgParts.join(' ');
-  }
+  // /**
+  //  * Returns the parts of the line as an unformatted string. This should only be
+  //  * used in situations where the line is not going to be emitted to the console
+  //  * or a log file, but is instead going to be emitted elsewhere, such as in a
+  //  * unit test or error message.
+  //  * @returns {string} - The parts of the line as a string.
+  //  */
+  // partsAsString(): string {
+  //   return [...this._msgParts, ...this._suffix].join(' ');
+  // }
 
-  protected addLevelPrefix() {
-    if (this._showOpts.level) {
-      let str = `[${getLogLevelString(this._level).toUpperCase()}]`;
-      const styleName = getLevelStyleName(this._level);
-      this.addMsgPart(rightPadAndTruncate(str, 9), styleName);
-      // this._msgParts.unshift(this._state.style[styleName](rightPadAndTruncate(str, 9)));
-    }
-    return this;
-  }
-
-  protected addTimePrefix(): this {
-    const timePrefix = this._showOpts.timestamp;
-    if (timePrefix) {
-      let time = '';
-      if (timePrefix === 'elapsed') {
-        time = this._timer.measureFormatted().total;
-      } else if (timePrefix === 'local') {
-        time = dateUtil(Date.now()).format('HH:mm:ss');
-      } else if (timePrefix === 'utc') {
-        time = dateUtil(Date.now()).tz('Z').format('HH:mm:ss');
-      }
-      this.addMsgPart(time, '_timePrefix');
-      // this._msgParts.unshift(this._state.style.timePrefix(time));
-    }
-    return this;
-  }
-
-  /**
-   * For logging in an Express or Koa environment, adds the request ID to the
-   * log line. This is for internal use by the emit method.
-   * @returns {this} The LoggerLine instance.
-   */
-  protected addReqId(): this {
-    if (this._showOpts.reqId) {
-      this.addMsgPart(this._reqId, '_reqId');
-      // this._msgParts.unshift(this._state.style.reqId(this._reqId));
-    }
-    return this;
-  }
-
-  /**
-   * Adds the session ID to the log line.
-   * @returns {this} The LoggerLine instance.
-   */
-  protected addSid(): this {
-    if (this._showOpts.sid) {
-      this.addMsgPart(this._reqId, '_sid');
-      // this._msgParts.unshift(this._state.style.sid(this._sid));
-    }
-    return this;
-  }
-
-  protected addEmitter(): this {
-    if (this._showOpts.emitter) {
-      this.addMsgPart(this._reqId, '_emitter');
-      // this._msgParts.unshift(this._state.style.emitter(this._emitter));
-    }
-    return this;
-  }
-
-  protected addAction(): this {
-    if (this._showOpts.action) {
-      this.addMsgPart(this._reqId, '_action');
-      // this._msgParts.unshift(this._state.style.action(this._action));
-    }
-    return this;
-  }
-
-  protected addPlain(...args: any[]): this {
-    this.addMsgPart(args.join(' '), '_plain');
-    return this;
-  }
-
-  protected addSuffix(): this {
-    this.addMsgPart(this._suffix.join(' '), '_suffix');
-    return this;
-  }
-
-  protected addElapsed(): this {
-    if (this._showElapsed && this._timer) {
-      const et = this._timer.measureFormatted();
-      this.addMsgPart(`${et.total} (${et.interval})`, '_elapsed');
-      // this.stylize('_elapsed', `${et.total} (${et.interval})`);
-    }
-    return this;
-  }
-
-  /**
-   * Returns the parts of the line as an unformatted string. This should only be
-   * used in situations where the line is not going to be emitted to the console
-   * or a log file, but is instead going to be emitted elsewhere, such as in a
-   * unit test or error message.
-   * @returns {string} - The parts of the line as a string.
-   */
-  partsAsString(): string {
-    return [...this._msgParts, ...this._suffix].join(' ');
-  }
-
-  /**
-   * Exposed for unit testing only.
-   * @returns {Record<string, any>} The current state of the LoggerLine.
-   */
-  unitState(): Record<string, any> {
-    return {
-      showOpts: this._showOpts,
-      enabled: this._enabled,
-      elapsed: this._showElapsed,
-      level: this._level
-    };
-  }
+  // /**
+  //  * Exposed for unit testing only.
+  //  * @returns {Record<string, any>} The current state of the LoggerLine.
+  //  */
+  // unitState(): Record<string, any> {
+  //   return {
+  //     showOpts: this._showOpts,
+  //     enabled: this._enabled,
+  //     elapsed: this._showElapsed,
+  //     level: this._level
+  //   };
+  // }
 
   /**
    * Adds our dynamic style methods to the logger instance.
@@ -440,12 +299,13 @@ export class LoggerLine {
   private addStyleMethods(): this {
     const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(this));
 
-    for (const name in this._lineFormat.style.styles) {
+    for (const name in defaultStyles) {
       if (!name.startsWith('_')) {
         if (methodNames.includes(name)) {
           throw new Error(`Cannot declare style with reserved name ${name}`);
         }
         (this as any)[name] = (...args: any[]): LoggerLineInstance => {
+          // @ts-ignore
           this.stylize(name as StyleName, ...args);
           return this as unknown as LoggerLineInstance;
         };

@@ -40,10 +40,12 @@ export class Logger {
     this._showOpts = options.show ??= {};
     this._style = options.style ??= new Style();
     const lineOpts: LoggerLineOpts = {
-      format: formatOpts
+      show: this._showOpts,
+      lineFormat: this._lineFormat,
+      transports: this._transports
     };
 
-    this._line = new LoggerLine(this._showOpts) as LoggerLineInstance;
+    this._line = new LoggerLine(lineOpts) as LoggerLineInstance;
   }
 
   /**
