@@ -4,6 +4,7 @@ import { LogLevelValue } from './levels';
 import { LoggerLineInstance } from './line';
 import { Style } from './styles';
 import { LoggerTransport, TransportOptions } from './transports';
+import { LineTransportOpts } from './types';
 
 export type TimePrefix = 'local' | 'utc' | 'elapsed' | false;
 
@@ -34,14 +35,15 @@ export type LineTransportOpts = Partial<{
   show: LoggerShowOpts;
   style: Style;
   levelThreshold: LogLevelValue;
+  errorStackThreshold: LogLevelValue;
   lineFormat: LoggerLineFormatOpts;
 }>;
 
-export type LoggerLineOpts = {
-  show: LoggerShowOpts;
-  lineFormat: LoggerLineFormatOpts;
-  transports: LineTransportOpts[];
-};
+// export type LoggerLineOpts = {
+//   show: LoggerShowOpts;
+//   lineFormat: LoggerLineFormatOpts;
+//   transports: LineTransportOpts[];
+// };
 
 export type LogMessage = {
   level?: LogLevelValue;
@@ -74,12 +76,17 @@ export type LoggerRunOpts = Partial<{
   allTransportsReady: boolean;
 }>;
 
-export type LogManagerOptions = Partial<{
-  timer: AppTimer;
+export type LogMgrDefaults = Partial<{
   show: LoggerShowOpts;
+  style: Style;
   separatorOpts: SeparatorOpts;
   levelThreshold: LogLevelValue;
   errorStackThreshold: LogLevelValue;
+}>;
+
+export type LogMgrOpts = Partial<{
+  timer: AppTimer;
+  defaults: LogMgrDefaults;
   run: LoggerRunOpts;
   /**
    * Array of transport options for logging.
@@ -90,17 +97,15 @@ export type LogManagerOptions = Partial<{
 }>;
 
 export type GetLoggerOptions = Partial<{
-  show: LoggerShowOpts;
-  separatorOpts: SeparatorOpts;
-  transports: TransportOptions[];
+  // separatorOpts: SeparatorOpts;
+  transportOpts: LineTransportOpts[];
   timer: AppTimer;
-  reqId: string;
+  // reqId: string;
 }>;
 
 export type LoggerOptions = Partial<{
-  show: LoggerShowOpts;
-  separatorOpts: SeparatorOpts;
-  transports: LoggerTransport[];
+  emitter: string;
+  transportOpts: LineTransportOpts[];
   timer: AppTimer;
   reqId: string;
 }>;

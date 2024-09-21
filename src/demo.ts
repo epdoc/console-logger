@@ -1,8 +1,9 @@
 import { AppTimer } from './apptimer';
 import { logLevel } from './levels';
+import { Logger } from './logger';
 import { LogManager } from './mgr';
 import { TransportOptions } from './transports';
-import { LoggerOptions, LogManagerOptions } from './types';
+import { LoggerOptions, LogMgrOpts } from './types';
 
 const appTimer = new AppTimer();
 
@@ -34,7 +35,7 @@ const transports: Record<string, TransportOptions> = {
   }
 };
 
-const opts: LogManagerOptions = {
+const opts: LogMgrOpts = {
   transports: [transports.console, transports.buffer],
   run: {
     autoRun: true
@@ -55,6 +56,6 @@ const loggerOpts: LoggerOptions = {
   transports: [transports.file1],
   reqId: '001'
 };
-const log: LoggerInstance = logMgr.getLogger(loggerOpts);
+const log: Logger = logMgr.getLogger('emitterName');
 
 log.info('Hello, world!');

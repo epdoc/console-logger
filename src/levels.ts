@@ -7,7 +7,7 @@ export const logLevel = {
   http: 3,
   verbose: 4,
   debug: 5,
-  silly: 6,
+  trace: 6,
   skip: 9
 } as const;
 

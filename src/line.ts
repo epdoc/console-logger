@@ -1,12 +1,13 @@
 import { Integer, isNonEmptyArray } from '@epdoc/typeutil';
 import { MethodName } from './../dist/src/style.d';
 import { AppTimer } from './apptimer';
-import { logLevel, LogLevelValue } from './levels';
+import { LogLevelValue } from './levels';
 import { Logger } from './logger';
 import { defaultStyles, StyleName } from './styles/base';
 import { TransportLine } from './transport-line';
 import { TransportType } from './transports';
 import { LineTransportOpts, LoggerLineFormatOpts } from './types';
+import { countTabsAtBeginningOfString } from './util';
 
 const DEFAULT_TAB_SIZE = 2;
 
@@ -32,12 +33,12 @@ export class LoggerLine {
   // protected _style: StyleInstance;
   protected _transportOpts: LineTransportOpts[];
   protected _transportLines: TransportLine[];
-  protected _msgIndent: string = '';
-  protected _msgParts: MsgPart[] = [];
-  protected _suffix: string[] = [];
+  // protected _msgIndent: string = '';
+  // protected _msgParts: MsgPart[] = [];
+  // protected _suffix: string[] = [];
   protected _timer: AppTimer;
-  protected _level: LogLevelValue = logLevel.info;
-  protected _levelThreshold: LogLevelValue;
+  // protected _level: LogLevelValue = logLevel.info;
+  // protected _levelThreshold: LogLevelValue;
   protected _showElapsed: boolean = false;
   protected _reqId: string;
   protected _sid: string;
@@ -54,12 +55,28 @@ export class LoggerLine {
   }
 
   /**
+   * Changes the level threshold that was initially set. Does so equally for all
+   * transports.
+   * @param {LogLevelValue} val - The level threshold.
+   * @returns {this} The LoggerLine instance.
+   */
+  setLevelThreshold(val: LogLevelValue): this {
+    this._transportLines.forEach((transportLine) => transportLine.setLevelThreshold(val));
+    return this;
+  }
+
+  setLevel(val: LogLevelValue): this {
+    this._transportLines.forEach((transportLine) => transportLine.setLevel(val));
+    return this;
+  }
+
+  /**
    * Returns true if the line is empty of a composed string message
    * @returns {boolean} - True if the line is empty, false otherwise.
    */
-  isEmpty(): boolean {
-    return this._msgParts.length === 0;
-  }
+  // isEmpty(): boolean {
+  //   return this._msgParts.length === 0;
+  // }
 
   // get stylizeEnabled(): boolean {
   //   return this._lineFormat.stylize ?? false;
@@ -121,8 +138,18 @@ export class LoggerLine {
     this._showElapsed = false;
     this._action = undefined;
     this._transportLines.forEach((transportLine) => transportLine.clear());
-    this._suffix = [];
     return this;
+  }
+
+  setInitialString(...args: any[]): LoggerLineInstance {
+    if (args.length) {
+      const count = countTabsAtBeginningOfString(args[0]);
+      if (count) {
+        this.tab(count);
+        args[0] = args[0].slice(count);
+      }
+    }
+    return this.stylize('text', ...args);
   }
 
   /**
@@ -137,7 +164,7 @@ export class LoggerLine {
   }
 
   level(val: LogLevelValue): this {
-    this._transportLines.forEach((transportLine) => transportLine.level(val));
+    this._transportLines.forEach((transportLine) => transportLine.setLevel(val));
     return this;
   }
 
@@ -183,11 +210,11 @@ export class LoggerLine {
     return this;
   }
 
-  addMsgPart(str: string, style?: StyleName): this {
-    // const _style = this.stylizeEnabled ? style : undefined;
-    this._msgParts.push({ str: str, style: style });
-    return this;
-  }
+  // addMsgPart(str: string, style?: StyleName): this {
+  //   // const _style = this.stylizeEnabled ? style : undefined;
+  //   this._msgParts.push({ str: str, style: style });
+  //   return this;
+  // }
 
   /**
    * Adds styled text to the log line.
@@ -256,18 +283,6 @@ export class LoggerLine {
     this.clear();
   }
 
-  // formatAsString(): string {
-  //   this.addLevelPrefix()
-  //     .addTimePrefix()
-  //     .addReqId()
-  //     .addSid()
-  //     .addEmitter()
-  //     .addAction()
-  //     .addSuffix()
-  //     .addElapsed();
-  //   return this._msgParts.join(' ');
-  // }
-
   // /**
   //  * Returns the parts of the line as an unformatted string. This should only be
   //  * used in situations where the line is not going to be emitted to the console
@@ -275,9 +290,9 @@ export class LoggerLine {
   //  * unit test or error message.
   //  * @returns {string} - The parts of the line as a string.
   //  */
-  // partsAsString(): string {
-  //   return [...this._msgParts, ...this._suffix].join(' ');
-  // }
+  partsAsString(): string {
+    return this._transportLines[0].formatAsString();
+  }
 
   // /**
   //  * Exposed for unit testing only.

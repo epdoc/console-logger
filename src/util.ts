@@ -42,3 +42,16 @@ export function isValidColor(val: any): val is Integer {
   }
   return false;
 }
+
+/** LLM generated function to count and remove tabs at the beginning of a string */
+export function countTabsAtBeginningOfString(str: string): Integer {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === '\t') {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}

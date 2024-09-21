@@ -59,6 +59,12 @@ export class TransportLine {
     // this.addStyleMethods();
   }
 
+  setLevelThreshold(val: LogLevelValue): this {
+    this._levelThreshold = val;
+    this.disableIfThresholdNotMet();
+    return this;
+  }
+
   /**
    * Returns true if the line is empty of a composed string message
    * @returns {boolean} - True if the line is empty, false otherwise.
@@ -111,7 +117,7 @@ export class TransportLine {
     return this;
   }
 
-  level(val: LogLevelValue): this {
+  setLevel(val: LogLevelValue): this {
     this._level = val;
     return this;
   }
@@ -255,17 +261,26 @@ export class TransportLine {
     }
   }
 
-  // formatAsString(): string {
-  //   this.addLevelPrefix()
-  //     .addTimePrefix()
-  //     .addReqId()
-  //     .addSid()
-  //     .addEmitter()
-  //     .addAction()
-  //     .addSuffix()
-  //     .addElapsed();
-  //   return this._msgParts.join(' ');
-  // }
+  /**
+   * Returns the parts of the line as a string. This is only used when throwing
+   * errors and for testing.
+   * @returns {string} - The parts of the line as a string.
+   */
+  formatAsString(): string {
+    this.addLevelPrefix()
+      .addTimePrefix()
+      .addReqId()
+      .addSid()
+      .addEmitter()
+      .addAction()
+      .addSuffix()
+      .addElapsed();
+    return this._msgParts
+      .map((part) => {
+        return part.str;
+      })
+      .join(' ');
+  }
 
   protected addLevelPrefix(): this {
     if (this._showOpts.level) {

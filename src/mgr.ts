@@ -1,19 +1,20 @@
-import { isArray, isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
+import { isArray, isDefined, isNonEmptyArray } from '@epdoc/typeutil';
 import { AppTimer, Microseconds } from './apptimer';
 import { logLevel, LogLevelValue, meetsLogThreshold } from './levels';
-import { Logger, LoggerOptions } from './logger';
+import { Logger } from './logger';
 import { TransportFactory } from './transports';
 import { LoggerTransport, TransportOptions } from './transports/base';
 import {
   GetLoggerOptions,
+  LoggerOptions,
   LoggerRunOpts,
-  LoggerShowOpts,
-  LogManagerOptions,
   LogMessage,
-  SeparatorOpts
+  LogMgrDefaults,
+  LogMgrOpts
 } from './types';
 
 let mgrIdx = 0;
+let emitterIdx = 0;
 const startTime: Microseconds = performance.now();
 
 /**
@@ -41,12 +42,13 @@ const startTime: Microseconds = performance.now();
 export type LogManagerCount = Partial<Record<LogLevelValue, number>>;
 
 export class LogManager {
-  protected _showOpts: LoggerShowOpts;
-  protected _separatorOpts: SeparatorOpts;
+  protected _defaults: LogMgrDefaults;
+  // protected _showOpts: LoggerShowOpts;
+  // protected _separatorOpts: SeparatorOpts;
   protected _runOpts: LoggerRunOpts;
   protected _timer: AppTimer;
-  protected _levelThreshold: LogLevelValue;
-  protected _errorStackThreshold: LogLevelValue;
+  // protected _levelThreshold: LogLevelValue;
+  // protected _errorStackThreshold: LogLevelValue;
 
   protected _transports: LoggerTransport[] = [];
   protected _queue: LogMessage[] = [];
@@ -56,17 +58,17 @@ export class LogManager {
   protected _transportFactory: TransportFactory = new TransportFactory();
   protected _count: LogManagerCount = {};
 
-  constructor(options: LogManagerOptions) {
+  constructor(options: LogMgrOpts) {
     this.setOptions(options);
   }
 
-  setOptions(options: LogManagerOptions) {
-    this._showOpts = options.show ??= {};
+  setOptions(options: LogMgrOpts = {}) {
+    // this._showOpts = options.show ??= {};
     this._timer = options.timer ??= new AppTimer(startTime);
     this._runOpts = options.run ??= { autoRun: true, allTransportsReady: true };
-    this._levelThreshold = options.levelThreshold ??= logLevel.info;
-    this._errorStackThreshold = options.errorStackThreshold ??= logLevel.error;
-    this._separatorOpts = options.separatorOpts ??= { char: '#', length: 70 };
+    this._defaults.levelThreshold = this._defaults.levelThreshold ??= logLevel.info;
+    this._defaults.errorStackThreshold = this._defaults.errorStackThreshold ??= logLevel.error;
+    // this._separatorOpts = options.separatorOpts ??= { char: '#', length: 70 };
     // this._sep = Array(this._sepLen).join(this._sepChar);
 
     this._running = false;
@@ -93,6 +95,15 @@ export class LogManager {
           return this.flushQueue();
         });
     }
+  }
+
+  getTransportByName(name: string, id?: string | number): LoggerTransport {
+    return this._transports.find((transport) => {
+      if (isDefined(id)) {
+        return transport.uid === `${name}:${id}`;
+      }
+      return transport.name === name;
+    });
   }
 
   addTransport(options: TransportOptions): LoggerTransport {
@@ -146,20 +157,22 @@ export class LogManager {
       });
   }
 
-  logger(options: GetLoggerOptions): LoggerInstance {
+  logger(emitter: string, options: GetLoggerOptions = {}): Logger {
     const opts: LoggerOptions = {
-      show: this._showOpts,
-      separatorOpts: this._separatorOpts,
-      run: this._runOpts,
-      transports: []
+      emitter: (emitter ??= `emitter-${emitterIdx++}`)
     };
-    if (isNonEmptyArray(options.transports)) {
-      options.transports.forEach((transportOptions) => {
-        const transport = this.addTransport(transportOptions);
-        opts.transports.push(transport);
-      });
+    if (isNonEmptyArray(options.transportOpts)) {
+      opts.transportOpts = [
+        {
+          transport: this.getTransportByName('console'),
+          show: this._defaults.show,
+          style: this._defaults.style,
+          levelThreshold: this._defaults.levelThreshold,
+          errorStackThreshold: this._defaults.errorStackThreshold
+        }
+      ];
     } else {
-      opts.transports = this._transports;
+      opts.transportOpts = options.transportOpts;
     }
     return new Logger(null, opts);
   }
@@ -185,7 +198,7 @@ export class LogManager {
     let remainingTransports = [];
     let jobs = [];
     this._transports.forEach((t) => {
-      if (transport.id === t.id) {
+      if (transport.uid === t.uid) {
         jobs.push(t.stop());
         this.logLogMgrMessage(
           logLevel.info,
@@ -212,20 +225,6 @@ export class LogManager {
   //   }
   //   return false;
   // }
-
-  /**
-   * Return one of the predefined transport classes by name. If you want to define your own class,
-   * it is suggested you subclass or copy one of the existing transports.
-   * @returns {*} LogManager Class for which you should call new with options, or if creating
-   *   your own transport you may subclass this object.
-   */
-  getTransportByName(type: string) {
-    if (isNonEmptyString(type)) {
-      // get the transport, dynamically load it if we can, otherwise just return it
-      // const transport = require('./transports/' + type);
-      // return transport;
-    }
-  }
 
   /**
    * Get the list of currently set transports.

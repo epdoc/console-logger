@@ -40,7 +40,11 @@ export class LoggerTransport {
     return undefined;
   }
 
-  get id(): string {
+  get id(): string | Integer {
+    return this._id;
+  }
+
+  get uid(): string {
     return `${this.name}:${this._id}`;
   }
 
