@@ -1,10 +1,10 @@
-import { isNonEmptyArray, isNonEmptyString } from '@epdoc/typeutil';
-import { logLevel, LogLevel, logLevelToValue, LogLevelValue } from './levels';
+import { isNonEmptyArray, isNonEmptyString, pad } from '@epdoc/typeutil';
+import { LogLevel, logLevel, logLevelToValue, LogLevelValue } from './levels';
 import { LoggerLine, LoggerLineInstance } from './line';
 // import { LoggerState, StateOptions, TimePrefix } from './state';
 import { LineTransportOpts, LoggerOptions } from './types';
 
-let reqId = 0;
+let id = 0;
 
 /**
  * Logger class
@@ -15,11 +15,13 @@ let reqId = 0;
  * ```
  */
 export class Logger {
+  protected _id: string = pad(id++, 4);
+  protected _perfId: string;
   protected _emitter?: string;
   protected _transportOpts: LineTransportOpts[] = [];
   // protected _msgParams: LogMessage = {};
   // protected _state: LoggerState;
-  protected _reqId?: string = String(reqId++);
+  protected _reqId?: string;
   protected _line: LoggerLineInstance;
   protected _initialized = false;
 
@@ -34,9 +36,27 @@ export class Logger {
     if (!isNonEmptyArray(options.transportOpts)) {
       throw new Error('Logger requires transports and transports are managed by the LogManager');
     }
+    this._perfId = `logger.${options.emitter}.${this._id}`;
+    performance.mark(this._perfId);
     this._emitter = options.emitter;
     this._transportOpts = options.transportOpts;
     this._line = new LoggerLine(options.transportOpts) as LoggerLineInstance;
+  }
+
+  get uid(): string {
+    return this._emitter + ':' + this._id;
+  }
+
+  resetTimer(): this {
+    performance.measure(this._perfId, this._perfId);
+    performance.clearMarks(this._perfId);
+    performance.clearMeasures(this._perfId);
+    performance.mark(this._perfId);
+    return this;
+  }
+
+  getElapsedTime(): number {
+    return performance.getEntriesByName(this._perfId)[0].duration;
   }
 
   /**
@@ -52,30 +72,10 @@ export class Logger {
     return this;
   }
 
-  // setTimePrefix(val: TimePrefix): this {
-  //   this._state.setTimePrefix(val);
-  //   return this;
-  // }
-
-  // setLevelPrefix(val: boolean): this {
-  //   this._state.setLevelPrefix(val);
-  //   return this;
-  // }
-
-  // setTab(val: Integer): this {
-  //   this._state.setTab(val);
-  //   return this;
-  // }
-
-  // setTimer(val: AppTimer): this {
-  //   this._state.setAppTimer(val);
-  //   return this;
-  // }
-
-  // clearLines(): this {
-  //   this._state.clearLines();
-  //   return this;
-  // }
+  reqId(val: string): this {
+    this._reqId = val;
+    return this;
+  }
 
   /**
    * Clears the current line, essentially resetting the output line.

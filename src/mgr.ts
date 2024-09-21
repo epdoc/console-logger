@@ -15,7 +15,6 @@ import {
 
 let mgrIdx = 0;
 let emitterIdx = 0;
-const startTime: Microseconds = performance.now();
 
 /**
  * Create a new LogManager object with no transports. Logged messages will not begin
@@ -60,11 +59,12 @@ export class LogManager {
 
   constructor(options: LogMgrOpts) {
     this.setOptions(options);
+    performance.mark('logmgr');
   }
 
   setOptions(options: LogMgrOpts = {}) {
     // this._showOpts = options.show ??= {};
-    this._timer = options.timer ??= new AppTimer(startTime);
+    // this._timer = options.timer ??= new AppTimer(startTime);
     this._runOpts = options.run ??= { autoRun: true, allTransportsReady: true };
     this._defaults.levelThreshold = this._defaults.levelThreshold ??= logLevel.info;
     this._defaults.errorStackThreshold = this._defaults.errorStackThreshold ??= logLevel.error;
@@ -174,7 +174,7 @@ export class LogManager {
     } else {
       opts.transportOpts = options.transportOpts;
     }
-    return new Logger(null, opts);
+    return new Logger(opts);
   }
 
   // function onClose() {
@@ -200,12 +200,12 @@ export class LogManager {
     this._transports.forEach((t) => {
       if (transport.uid === t.uid) {
         jobs.push(t.stop());
-        this.logLogMgrMessage(
-          logLevel.info,
-          'logger.transport.remove',
-          `Removed transport ${t.toString()}`,
-          { transport: t.toString() }
-        );
+        this.logLogMgrMessage({
+          level: logLevel.info,
+          action: 'logger.transport.remove',
+          message: `Removed transport ${t.uid}`,
+          data: { transport: t.uid }
+        });
       } else {
         remainingTransports.push(t);
       }
@@ -247,7 +247,7 @@ export class LogManager {
     if (this._running && this._queue.length) {
       if (this._transports.length) {
         if (this._runOpts.allTransportsReady || !this.checkIfAllTransportsAreReady()) {
-          let nextMsg: LoggerMessage = this._queue.shift();
+          let nextMsg: LogMessage = this._queue.shift();
           if (nextMsg) {
             this._transports.forEach((transport) => {
               let logLevel = transport.level || nextMsg._logLevel || this.logLevel;
@@ -332,7 +332,7 @@ export class LogManager {
    */
   logLogMgrMessage(msg: LogMessage) {
     //level: LogLevelValue, action: string, message: string, data: Dict) {
-    let params = Object.assign({ emitter: 'logger' }, msg);
+    let params = Object.assign({ emitter: 'logger', timestamp:  }, msg);
     return this.logParams(params);
   }
 

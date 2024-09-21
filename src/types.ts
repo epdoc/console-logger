@@ -1,7 +1,6 @@
 import { Dict, Integer } from '@epdoc/typeutil';
 import { AppTimer } from './apptimer';
 import { LogLevelValue } from './levels';
-import { LoggerLineInstance } from './line';
 import { Style } from './styles';
 import { LoggerTransport, TransportOptions } from './transports';
 import { LineTransportOpts } from './types';
@@ -46,12 +45,12 @@ export type LineTransportOpts = Partial<{
 // };
 
 export type LogMessage = {
+  emitter?: string;
+  action?: string;
   level?: LogLevelValue;
   reqId?: string;
   static?: string;
-  action?: string;
-  emitter?: string;
-  message?: LoggerLineInstance;
+  message?: string;
   data?: Dict;
 };
 
